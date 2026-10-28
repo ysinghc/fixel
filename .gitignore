@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# Node
+node_modules/
+web/dist/
+
+# Fixel runtime state (cache, worktrees, artifacts, SQLite)
+.fixel/
+
+# Secrets
+.env

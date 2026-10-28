@@ -1,0 +1,32 @@
+# Draft config; schema is settled while building the scan CLI (guide sections 2, 8.3, 14.3).
+target:
+  name: demo-app
+  path: targets/demo-app            # git submodule
+  dev_cmd: "npm run dev -- --port {port}"
+  base_url: http://localhost:5173
+  env:
+    FIXEL: "1"                      # enables the data-loc babel plugin in the target
+
+routes:                             # or: storybook: { index: http://localhost:6006/index.json }
+  - /
+  - /checkout
+
+matrix:
+  widths: [320, 375, 414, 768, 1024, 1280, 1440]
+  themes: [light, dark]
+  text_stress: [none, pseudo]
+
+concurrency:
+  browser_contexts: 4
+  sam: 4
+  spark: 4
+  fix_sessions: 1
+
+budget:
+  max_usd_per_run: 10
+
+models:
+  triage: muse-spark-1.3
+  fixer: muse-wonder-1.0
+  fixer_fallback: muse-spark-1.3
+  segmentation: sam-3.1
