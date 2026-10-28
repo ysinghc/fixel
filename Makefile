@@ -2,6 +2,7 @@
 
 install:
 	pip install -e ".[dev]"
+	npm install
 	playwright install chromium
 
 test:

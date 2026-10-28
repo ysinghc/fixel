@@ -1,0 +1,17 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fixture checkout</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.4 sans-serif;color:#111;background:#fff}
+  main{padding:16px}
+  .spacer{height:420px}
+  .pay{width:160px;height:44px}
+  .cookie{position:fixed;left:0;right:0;bottom:0;height:140px;background:#222;color:#fff;padding:16px;z-index:50}
+</style>
+<main>
+  <h1>Checkout</h1>
+  <div class="spacer"></div>
+  <button class="pay">Pay now</button>
+</main>
+<div class="cookie">We use cookies</div>   <!-- BUG: covers the Pay button at short viewports -->

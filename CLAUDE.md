@@ -26,9 +26,22 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 
 ## Commands
 
-- `make install`: install the package with dev extras and Chromium.
-- `make test`: run pytest.
+- `make install`: install the package with dev extras, `npm install` (axe-core) and Chromium.
+- `make test`: run pytest. Oracle and scan tests drive real Chromium; set `FIXEL_CHROMIUM_PATH` to a Chromium binary if Playwright's own download is absent (the test conftest defaults it to `/opt/pw-browsers/chromium` when present).
+- `fixel scan --static tests/fixtures/site --route /index.html --widths 320 1440`: geometry-only scan of the planted-bug fixture site. Without `--static`, it scans the running app at `target.base_url`.
 - `make demo-smoke`: run the demo path from cache (`FIXEL_MODE=replay`); the test it runs is not written yet.
+
+## Status
+
+Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, and `fixel scan` (geometry only). Everything else under `backend/fixel/` is still a stub.
+
+## Deviations from the guide
+
+- `cand()` in `detect/oracles.py` returns a Candidate with `state_key=""` and `tile=-1`; `run_oracles(cap)` stamps both (the guide's snippet calls `cand` without the state, which `Candidate` requires).
+- `element_protrusion` skips `position: fixed` children: they are laid out against the viewport, so parent containment is meaningless (a cookie banner was reported as protruding from `<body>`).
+- `meta/client.py` creates the OpenAI client lazily and reads `FIXEL_MODE` per call, so replay and tests need no API key.
+- `capture()` is split into `prepare()` + `capture_page()` so tests can tile a page loaded with `set_content`.
+- `route_url`, `is_stacked`, `PSEUDO_LOC_JS` and `replay_step` were referenced but not defined in the guide. Pseudo-localization doubles and accents vowels (about +35% length); `replay_step` raises `NotImplementedError` until the explorer (guide section 8.2) is built.
 
 ## Build order and cut order
 

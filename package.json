@@ -1,0 +1,8 @@
+{
+  "name": "fixel",
+  "private": true,
+  "description": "Node-side dependencies for Fixel (axe-core is injected into captured pages).",
+  "devDependencies": {
+    "axe-core": "4.10.2"
+  }
+}
