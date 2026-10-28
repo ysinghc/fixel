@@ -26,8 +26,14 @@ def ancestors(e: Element, by_id: dict[int, Element]):
 
 
 def is_stacked(a: Element, b: Element, by_id: dict[int, Element]) -> bool:
-    """True when either element is positioned out of normal flow: a hint for triage, not a filter."""
-    return any(e.style["position"] not in ("static", "") for e in (a, b))
+    """True when either element is positioned out of normal flow, or sits inside a fixed or sticky ancestor
+    (a sticky nav overlays whatever scrolls under it). A hint for triage, not a filter."""
+    for e in (a, b):
+        if e.style["position"] not in ("static", ""):
+            return True
+        if any(by_id[x].style["position"] in ("fixed", "sticky") for x in ancestors(e, by_id)):
+            return True
+    return False
 
 
 def is_visual_container(p: Element) -> bool:

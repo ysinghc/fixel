@@ -1,6 +1,8 @@
-"""`fixel scan`: render every state, run the geometry oracles, write candidates (guide sections 2, 6.2, 6.3).
+"""`fixel scan`: render every state, run the geometry oracles and the opacity diff, fuse into findings
+(guide sections 2, 6.2-6.4, 6.6).
 
-Geometry-only for now: pixel evidence, triage and grouping into findings come next (guide section 13).
+SAM evidence and Spark triage are not wired yet (they need the API key); findings are decided by geometry plus
+the model-free opacity diff alone, which is also the fallback when a model is down.
 """
 import argparse
 import asyncio
@@ -9,13 +11,15 @@ import http.server
 import json
 import threading
 import time
-from collections import defaultdict
 from pathlib import Path
+from typing import NamedTuple
 
 from . import config as cfg
 from .capture.browser import Browsers, capture, new_context
+from .detect.fuse import fuse
 from .detect.oracles import run_oracles
-from .models import Candidate, Capture, StateSpec
+from .detect.pixels import pixel_evidence
+from .models import Candidate, Capture, Finding, PixelEvidence, StateSpec
 from .store import ArtifactStore
 from .target import TargetServer
 
@@ -28,9 +32,16 @@ def serve_static(directory: Path) -> tuple[http.server.ThreadingHTTPServer, str]
     return server, f"http://127.0.0.1:{server.server_address[1]}"
 
 
+class Scanned(NamedTuple):
+    cap: Capture
+    candidates: list[Candidate]
+    evidence: list[PixelEvidence]
+
+
 async def scan_states(states: list[StateSpec], base_url: str, store: ArtifactStore, parallel: int = 4,
-                      progress=None) -> list[tuple[Capture, list[Candidate]]]:
-    results: list[tuple[Capture, list[Candidate]]] = []
+                      progress=None) -> list[Scanned]:
+    """Capture each state, run the geometry oracles, then the opacity diff while the page is still open."""
+    results: list[Scanned] = []
     sem = asyncio.Semaphore(parallel)
     async with Browsers() as browser:
         async def one(s: StateSpec):
@@ -38,43 +49,24 @@ async def scan_states(states: list[StateSpec], base_url: str, store: ArtifactSto
                 ctx = await new_context(browser)
                 try:
                     page, cap = await capture(ctx, base_url, s, store)
-                    await page.close()
                     cands = run_oracles(cap)
+                    evidence = [await pixel_evidence(page, cap, c) for c in cands]
+                    await page.close()
                 finally:
                     await ctx.close()
-                results.append((cap, cands))
+                results.append(Scanned(cap, cands, evidence))
                 if progress:
                     progress(s, len(cands))
         await asyncio.gather(*(one(s) for s in states))
-    results.sort(key=lambda r: r[0].state.key)
+    results.sort(key=lambda r: r.cap.state.key)
     return results
 
 
-def describe(cap: Capture, c: Candidate) -> str:
-    """A readable identity for display: element tags with source location or a text snippet."""
-    by_id = {e.id: e for e in cap.tiles[max(c.tile, 0)].elements}
-    parts = []
-    for i in c.elements:
-        e = by_id.get(i)
-        if e:
-            parts.append(e.loc or (f"{e.tag}“{e.text[:24]}”" if e.text else e.tag))
-    return " + ".join(parts) or "?"
+def findings_of(results: list[Scanned]) -> list[Finding]:
+    return fuse([(r.cap, c, e) for r in results for c, e in zip(r.candidates, r.evidence)])
 
 
-def summarize(results) -> list[dict]:
-    """Group the same candidate across states into one row with its width range (display only)."""
-    groups: dict[tuple, dict] = defaultdict(lambda: {"widths": set(), "states": set()})
-    for cap, cands in results:
-        for c in cands:
-            g = groups[(c.type, describe(cap, c))]
-            g["widths"].add(cap.state.width)
-            g["states"].add(cap.state.key)
-    rows = [{"type": t, "where": w, "widths": sorted(g["widths"]), "states": len(g["states"])}
-            for (t, w), g in groups.items()]
-    return sorted(rows, key=lambda r: (r["type"], r["where"]))
-
-
-async def run_scan(conf: cfg.Config, states, base_url: str | None, progress) -> list:
+async def run_scan(conf: cfg.Config, states, base_url: str | None, progress) -> list[Scanned]:
     """Scan base_url if given, otherwise start the configured target's dev server for the duration."""
     store, par = ArtifactStore(), conf.concurrency.browser_contexts
     if base_url:
@@ -106,23 +98,25 @@ def cmd_scan(args) -> int:
     finally:
         if server:
             server.shutdown()
-    rows = summarize(results)
+    findings = findings_of(results)
     (out / "candidates.json").write_text(json.dumps(
-        [{"state": cap.state.model_dump(), "candidates": [c.model_dump() for c in cands]}
-         for cap, cands in results], indent=1))
-    (out / "summary.json").write_text(json.dumps(rows, indent=1))
-    print(f"\n{len(rows)} distinct candidates (geometry only, unconfirmed):")
-    for r in rows:
-        w = r["widths"]
-        print(f"  {r['type']:<20} {r['where']:<48} {w[0]}–{w[-1]}px  ({r['states']} states)")
-    print(f"\nwrote {out}/candidates.json and summary.json")
+        [{"state": r.cap.state.model_dump(), "candidates": [c.model_dump() for c in r.candidates],
+          "evidence": [e.model_dump() for e in r.evidence]} for r in results], indent=1))
+    (out / "findings.json").write_text(json.dumps([f.model_dump() for f in findings], indent=1))
+    statuses = ("confirmed", "needs_review", "dismissed", "not_observable")
+    print(f"\n{len(findings)} findings (geometry + opacity diff; SAM and Spark triage not wired yet): "
+          + ", ".join(f"{sum(f.status == st for f in findings)} {st.replace('_', ' ')}" for st in statuses))
+    for f in findings:
+        where = " + ".join(f.locs) or f.key.split("|", 1)[1]
+        print(f"  {f.status:<14} {f.type:<20} {where:<56} {f.widths[0]}–{f.widths[-1]}px")
+    print(f"\nwrote {out}/findings.json and candidates.json")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fixel")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sc = sub.add_parser("scan", help="render the state matrix and run the geometry oracles")
+    sc = sub.add_parser("scan", help="render the state matrix, run the oracles and the opacity diff")
     sc.add_argument("--config", default="fixel.yaml")
     sc.add_argument("--base-url", help="scan an already running app instead of starting the target")
     sc.add_argument("--static", help="serve this directory instead of using a running app")

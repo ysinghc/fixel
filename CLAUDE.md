@@ -34,7 +34,7 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 
 ## Status
 
-Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, `fixel scan` (geometry only; starts and stops the target's dev server via `target.py`), and the data-loc Vite plugin in `tooling/`. Targets live in `targets/` as submodules (see `targets/README.md`). Everything else under `backend/fixel/` is still a stub.
+Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, `fixel scan` (geometry only; starts and stops the target's dev server via `target.py`), and the data-loc Vite plugin in `tooling/`. Targets live in `targets/` as submodules (see `targets/README.md`). Also built: `detect/pixels.py` (model-free opacity diff; SAM not yet) and `detect/fuse.py` (observability, decision policy, finding keys, grouping across widths); `fixel scan` now prints fused findings. Still stubs: SAM box prompts, Spark triage, localization via CDP, the whole fix/verify side, explorer, bench, API and UI.
 
 ## Deviations from the guide
 
@@ -45,6 +45,9 @@ Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, ret
 - `route_url`, `is_stacked`, `PSEUDO_LOC_JS` and `replay_step` were referenced but not defined in the guide. Pseudo-localization doubles and accents vowels (about +35% length); `replay_step` raises `NotImplementedError` until the explorer (guide section 8.2) is built.
 
 - **data-loc is injected by a standalone Vite plugin, not the guide's `react({ babel: { plugins } })`.** `@vitejs/plugin-react` v6 (Vite 8) dropped Babel, so the guide's route fails on the dev-split targets. `tooling/vite-plugin-data-loc.mjs` runs Babel itself before the framework transform and works with plugin-react v4/v5/v6 and the SWC plugin; `tooling/vite.config.fixel.mjs` wraps the target's own config (path in `FIXEL_TARGET_CONFIG`), so target files are never edited. `tooling/babel-plugin-data-loc.cjs` is still the visitor it uses. Verified on iiitu-acm (Vite 8 / plugin-react 6): findings resolve to e.g. `src/components/Footer.jsx:90:9`.
+
+- **Opacity diff extensions (`detect/pixels.py`):** collisions are tested both ways (hide A, hide B) since either may be on top; occlusion diffs the *full rectangles* of target and coverer (a banner's text box is nowhere near the button it covers); element protrusion measures paint in the part of the child outside its parent, because there is no overlap to diff.
+- **`is_stacked` looks at ancestors:** a sticky or fixed ancestor marks a pair as stacked (hint for triage). Scroll-tiled captures always show a sticky nav overlapping scrolled content, e.g. iiitu-acm's `Layout.jsx:45` collides with footer links in the pixels but by design; Spark's "intentional" verdict is what dismisses those, so without the key they stay `confirmed`.
 
 ## Build order and cut order
 

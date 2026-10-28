@@ -42,6 +42,14 @@ def test_collision_ignores_parent_child_and_separate_blocks(found):
     assert not types(found(html), "collision")
 
 
+def test_collision_under_sticky_header_is_hinted_as_stacked(found):
+    # content scrolled under a sticky nav collides by design; the hint lets triage dismiss it
+    html = RESET + ('<nav style="position:sticky;top:0;height:40px;background:#fff"><span>Site name</span></nav>'
+                    '<div style="height:20px"></div><p style="margin:-45px 0 0">Overlapping paragraph</p>')
+    hits = types(found(html), "collision")
+    assert hits and all(c.metrics["stacked"] == 1.0 for c in hits)
+
+
 # --- element protrusion --------------------------------------------------------------------
 def test_element_protrusion_fires_when_child_leaves_card(found):
     html = RESET + ('<div style="width:200px;height:60px;background:#eee;margin:10px">'
