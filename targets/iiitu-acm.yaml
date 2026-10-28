@@ -1,0 +1,5 @@
+# Development split. React 19 + Vite 8 + Tailwind 4 + React Router; no LICENSE file (author's own code).
+target:
+  name: iiitu-acm
+  path: targets/iiitu-acm/client
+routes: [/, /events, /team, /members, /verticals, /login, /reset-password]

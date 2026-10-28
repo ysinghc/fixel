@@ -1,0 +1,9 @@
+[submodule "targets/iiitu-acm"]
+	path = targets/iiitu-acm
+	url = https://github.com/ysinghc/iiitu-acm
+[submodule "targets/pastebin"]
+	path = targets/pastebin
+	url = https://github.com/ysinghc/pastebin
+[submodule "targets/aavesh"]
+	path = targets/aavesh
+	url = https://github.com/ysinghc/aavesh

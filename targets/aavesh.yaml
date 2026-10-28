@@ -1,0 +1,6 @@
+# Test split. React 19 + Vite 6 + Tailwind 3 + three.js/gsap; single page. LICENSE is GPL v2 (a fork), so it is
+# only referenced as a submodule pointer; none of its code is copied into this repo.
+target:
+  name: aavesh
+  path: targets/aavesh/client
+routes: [/]

@@ -1,9 +1,15 @@
-.PHONY: install test demo-smoke
+.PHONY: install targets test demo-smoke
 
 install:
 	pip install -e ".[dev]"
 	npm install
 	playwright install chromium
+
+targets:
+	git submodule update --init --depth 1
+	cd targets/iiitu-acm/client && npm install
+	cd targets/pastebin/frontend && npm install
+	cd targets/aavesh/client && npm install
 
 test:
 	pytest

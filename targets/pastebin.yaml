@@ -1,0 +1,6 @@
+# Development split. React 19 + Vite 8 + Tailwind 4; single page whose states (create / retrieve) need the
+# explorer. No LICENSE file (author's own code).
+target:
+  name: pastebin
+  path: targets/pastebin/frontend
+routes: [/]

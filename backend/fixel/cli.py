@@ -17,6 +17,7 @@ from .capture.browser import Browsers, capture, new_context
 from .detect.oracles import run_oracles
 from .models import Candidate, Capture, StateSpec
 from .store import ArtifactStore
+from .target import TargetServer
 
 
 def serve_static(directory: Path) -> tuple[http.server.ThreadingHTTPServer, str]:
@@ -73,6 +74,16 @@ def summarize(results) -> list[dict]:
     return sorted(rows, key=lambda r: (r["type"], r["where"]))
 
 
+async def run_scan(conf: cfg.Config, states, base_url: str | None, progress) -> list:
+    """Scan base_url if given, otherwise start the configured target's dev server for the duration."""
+    store, par = ArtifactStore(), conf.concurrency.browser_contexts
+    if base_url:
+        return await scan_states(states, base_url, store, par, progress)
+    async with TargetServer(conf.target) as url:
+        print(f"started {conf.target.name} at {url}")
+        return await scan_states(states, url, store, par, progress)
+
+
 def cmd_scan(args) -> int:
     conf = cfg.load(args.config) if Path(args.config).exists() else cfg.Config()
     if args.widths:
@@ -83,18 +94,15 @@ def cmd_scan(args) -> int:
         conf.matrix.text_stress = args.stress
     if args.route:
         conf.routes = args.route
-    server = None
-    base_url = args.base_url or conf.target.base_url
+    server, base_url = None, args.base_url
     if args.static:
         server, base_url = serve_static(Path(args.static))
     states = conf.states()
     out = Path(args.out or f".fixel/runs/{time.strftime('%Y%m%d-%H%M%S')}")
     out.mkdir(parents=True, exist_ok=True)
-    print(f"scanning {len(states)} states at {base_url}")
+    print(f"scanning {len(states)} states" + (f" at {base_url}" if base_url else f" of {conf.target.name}"))
     try:
-        results = asyncio.run(scan_states(
-            states, base_url, ArtifactStore(), conf.concurrency.browser_contexts,
-            progress=lambda s, n: print(f"  {s.key:<48} {n} candidates")))
+        results = asyncio.run(run_scan(conf, states, base_url, lambda s, n: print(f"  {s.key:<48} {n} candidates")))
     finally:
         if server:
             server.shutdown()
@@ -116,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sc = sub.add_parser("scan", help="render the state matrix and run the geometry oracles")
     sc.add_argument("--config", default="fixel.yaml")
-    sc.add_argument("--base-url", help="override target.base_url")
+    sc.add_argument("--base-url", help="scan an already running app instead of starting the target")
     sc.add_argument("--static", help="serve this directory instead of using a running app")
     sc.add_argument("--route", action="append", help="override routes (repeatable)")
     sc.add_argument("--widths", type=int, nargs="+")

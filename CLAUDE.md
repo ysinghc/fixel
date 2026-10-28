@@ -29,11 +29,12 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 - `make install`: install the package with dev extras, `npm install` (axe-core) and Chromium.
 - `make test`: run pytest. Oracle and scan tests drive real Chromium; set `FIXEL_CHROMIUM_PATH` to a Chromium binary if Playwright's own download is absent (the test conftest defaults it to `/opt/pw-browsers/chromium` when present).
 - `fixel scan --static tests/fixtures/site --route /index.html --widths 320 1440`: geometry-only scan of the planted-bug fixture site. Without `--static`, it scans the running app at `target.base_url`.
+- `make targets`: init the target submodules and `npm install` each app. Then `fixel scan --config targets/iiitu-acm.yaml` starts that app's dev server itself (with the data-loc plugin), scans it, and stops it.
 - `make demo-smoke`: run the demo path from cache (`FIXEL_MODE=replay`); the test it runs is not written yet.
 
 ## Status
 
-Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, and `fixel scan` (geometry only). Everything else under `backend/fixel/` is still a stub.
+Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, `fixel scan` (geometry only; starts and stops the target's dev server via `target.py`), and the data-loc Vite plugin in `tooling/`. Targets live in `targets/` as submodules (see `targets/README.md`). Everything else under `backend/fixel/` is still a stub.
 
 ## Deviations from the guide
 
@@ -42,6 +43,8 @@ Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, ret
 - `meta/client.py` creates the OpenAI client lazily and reads `FIXEL_MODE` per call, so replay and tests need no API key.
 - `capture()` is split into `prepare()` + `capture_page()` so tests can tile a page loaded with `set_content`.
 - `route_url`, `is_stacked`, `PSEUDO_LOC_JS` and `replay_step` were referenced but not defined in the guide. Pseudo-localization doubles and accents vowels (about +35% length); `replay_step` raises `NotImplementedError` until the explorer (guide section 8.2) is built.
+
+- **data-loc is injected by a standalone Vite plugin, not the guide's `react({ babel: { plugins } })`.** `@vitejs/plugin-react` v6 (Vite 8) dropped Babel, so the guide's route fails on the dev-split targets. `tooling/vite-plugin-data-loc.mjs` runs Babel itself before the framework transform and works with plugin-react v4/v5/v6 and the SWC plugin; `tooling/vite.config.fixel.mjs` wraps the target's own config (path in `FIXEL_TARGET_CONFIG`), so target files are never edited. `tooling/babel-plugin-data-loc.cjs` is still the visitor it uses. Verified on iiitu-acm (Vite 8 / plugin-react 6): findings resolve to e.g. `src/components/Footer.jsx:90:9`.
 
 ## Build order and cut order
 

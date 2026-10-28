@@ -3,6 +3,9 @@
   "private": true,
   "description": "Node-side dependencies for Fixel (axe-core is injected into captured pages).",
   "devDependencies": {
+    "@babel/core": "^8.0.9",
+    "@babel/plugin-syntax-jsx": "^8.0.1",
+    "@babel/plugin-syntax-typescript": "^8.0.3",
     "axe-core": "4.10.2"
   }
 }
