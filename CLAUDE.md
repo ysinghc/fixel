@@ -34,7 +34,9 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 
 ## Status
 
-Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, retry), `capture/` (snapshot, tiling, axe, pseudo-localization), all geometry oracles with HTML-fixture tests, `fixel scan` (geometry only; starts and stops the target's dev server via `target.py`), and the data-loc Vite plugin in `tooling/`. Targets live in `targets/` as submodules (see `targets/README.md`). Also built: `detect/pixels.py` (model-free opacity diff; SAM not yet) and `detect/fuse.py` (observability, decision policy, finding keys, grouping across widths); `fixel scan` now prints fused findings. Still stubs: SAM box prompts, Spark triage, localization via CDP, the whole fix/verify side, explorer, bench, API and UI.
+Working end to end for detection: `fixel scan` captures each state, runs the geometry oracles, the opacity diff and SAM 3.1 box prompts, triages with Spark 1.3, and fuses the result into findings. Built: `models.py`, `store.py`, `config.py`, `target.py` (starts/stops a target's dev server), `meta/client.py` (cache, modes, retry), `meta/sam.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `cli.py`, and the data-loc Vite plugin in `tooling/`. Targets are submodules in `targets/` (see `targets/README.md`). Spike results and the guide's answered open questions are in `docs/SPIKES.md`.
+
+Still stubs: source localization via CDP, the whole fix side (`fix/`: Wonder agent, worktree, linter), the verifier, the explorer, `bench/`, the API and the UI. Next in the build plan (guide section 13): data-loc/CDP fix context, worktree, fix agent with a search/replace edit tool, linter, then the model-free verifier.
 
 ## Deviations from the guide
 
@@ -48,6 +50,12 @@ Built: `models.py`, `store.py`, `config.py`, `meta/client.py` (cache, modes, ret
 
 - **Opacity diff extensions (`detect/pixels.py`):** collisions are tested both ways (hide A, hide B) since either may be on top; occlusion diffs the *full rectangles* of target and coverer (a banner's text box is nowhere near the button it covers); element protrusion measures paint in the part of the child outside its parent, because there is no overlap to diff.
 - **`is_stacked` looks at ancestors:** a sticky or fixed ancestor marks a pair as stacked (hint for triage). Scroll-tiled captures always show a sticky nav overlapping scrolled content, e.g. iiitu-acm's `Layout.jsx:45` collides with footer links in the pixels but by design; Spark's "intentional" verdict is what dismisses those, so without the key they stay `confirmed`.
+
+- **SAM is parsed without `meta-sam-parser`** (its install was refused in this environment). `meta/sam.py` builds prompts and parses records against the documented grammar; evidence is the box confidence and returned-bounds IoU. Occlusion is observable when SAM confidence < 0.8 (spike 1: clear 0.98, covered 0.42-0.61). Mask fill/spill is not computed, and `PixelEvidence.sam_spill` is bounds-based until masks are decoded.
+- **Transient overlaps are dismissed by code** (`oracles.is_transient` -> `metrics["transient"]` -> `fuse.decide`): a fixed/sticky element over in-flow content the user can scroll apart is by design. Spark was inconsistent on these.
+- **Candidates are kept only in tiles where their elements are on screen** (`oracles.on_screen`); the snapshot lists off-screen elements too. Contrast is placed in the first tile that shows the element.
+- **Triage output is validated inside the cached call**, so an out-of-range answer is retried and never cached.
+- **Key variable:** `MODEL_API_KEY`, or `META_MODEL_API` (the name this environment stores it under).
 
 ## Build order and cut order
 
