@@ -6,11 +6,14 @@ so the verifier can use it. Extensions beyond the guide's snippet:
   * element protrusion measures paint in the part of the child outside its parent, since there is no overlap.
 """
 import io
+from collections import defaultdict
 
 import numpy as np
 from PIL import Image
 
+from ..meta.sam import clamp_box, iou_and_spill, segment_boxes
 from ..models import Candidate, Capture, Element, PixelEvidence
+from ..store import ArtifactStore
 from .fuse import observable
 from .oracles import box, inter
 
@@ -83,3 +86,45 @@ async def pixel_evidence(page, cap: Capture, c: Candidate) -> PixelEvidence:
         diff = await hidden_diff(page, tile.scroll_y, child.id, outside(box(child), parent.rect))
     px = PixelEvidence(opacity_diff=diff, observable=False)
     return px.model_copy(update={"observable": observable(c, px)})
+
+
+SAM_TYPES = {"occlusion", "collision", "element_protrusion"}
+
+
+def sam_rects(cap: Capture, c: Candidate) -> dict[int, tuple]:
+    """Element id -> the rectangle SAM is asked about: the covered target, both colliding texts, or the protruding child."""
+    by_id = {e.id: e for e in cap.tiles[c.tile].elements}
+    els = [by_id[i] for i in c.elements if i in by_id]
+    if c.type == "occlusion" and els:
+        return {els[0].id: els[0].rect}
+    if c.type == "collision":
+        return {e.id: box(e) for e in els}
+    if c.type == "element_protrusion" and els:
+        return {els[0].id: box(els[0])}
+    return {}
+
+
+async def add_sam(cap: Capture, cands: list[Candidate], evidence: list[PixelEvidence], store: ArtifactStore,
+                  emit=None) -> list[PixelEvidence]:
+    """Ask SAM 3.1 what is painted in each candidate's DOM boxes (one request per tile, 16 objects per request)
+    and fold its confidence and returned bounds into the evidence. Raises if the model cannot be called."""
+    size = (cap.vw, cap.vh)                       # scale 1: CSS px == image px
+    per_tile: dict[int, dict[int, tuple]] = defaultdict(dict)
+    for c in cands:
+        for i, r in sam_rects(cap, c).items():
+            if (b := clamp_box(r, size)):
+                per_tile[c.tile][i] = b
+    got = {t: await segment_boxes(store.get(cap.tiles[t].png_sha), cap.tiles[t].png_sha, size, boxes, emit)
+           for t, boxes in per_tile.items()}
+    out = []
+    for c, px in zip(cands, evidence):
+        pairs = [(got[c.tile][i], per_tile[c.tile][i]) for i in sam_rects(cap, c)
+                 if i in per_tile.get(c.tile, {}) and i in got.get(c.tile, {}) and got[c.tile][i].conf is not None]
+        if not pairs:
+            out.append(px)
+            continue
+        m = [iou_and_spill(b, g) for g, b in pairs]
+        px = px.model_copy(update={"sam_conf": min(g.conf for g, _ in pairs), "sam_iou": min(i for i, _ in m),
+                                   "sam_spill": max(s for _, s in m)})
+        out.append(px.model_copy(update={"observable": observable(c, px)}))
+    return out

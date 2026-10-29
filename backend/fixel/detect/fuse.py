@@ -4,7 +4,7 @@ from collections import defaultdict
 
 from ..models import Candidate, Capture, Element, Finding, PixelEvidence, Triage
 
-T = {"spill": 0.35, "diff": 0.05}            # starting values; tuned on the dev split only
+T = {"spill": 0.35, "diff": 0.05, "conf": 0.8}            # starting values; tuned on the dev split only
 ALWAYS_OBSERVABLE = {"viewport_protrusion", "clipped_text", "contrast", "small_target"}
 # strongest first: a finding takes the best status any of its candidates reached
 STATUS_RANK = ["confirmed", "needs_review", "dismissed", "not_observable"]
@@ -15,12 +15,16 @@ def observable(c: Candidate, px: PixelEvidence) -> bool:
         return True                          # horizontal scroll or hidden text is visible by definition
     if c.type == "collision":
         return (px.opacity_diff or 0) > T["diff"]
-    return (px.sam_spill or 0) > T["spill"] or (px.opacity_diff or 0) > T["diff"]   # occlusion, protrusion
+    covered = c.type == "occlusion" and px.sam_conf is not None and px.sam_conf < T["conf"]
+    # SAM sees no distinct object where the DOM says a button is (spike 1: clear 0.98, covered 0.42-0.61)
+    return covered or (px.sam_spill or 0) > T["spill"] or (px.opacity_diff or 0) > T["diff"]   # occlusion, protrusion
 
 
 def decide(c: Candidate, px: PixelEvidence, tri: Triage | None) -> str:
     if not px.observable:
         return "not_observable"
+    if c.metrics.get("transient"):
+        return "dismissed"                   # scrolls apart by design (sticky nav over scrolled content); code decides
     if tri is None:
         return "confirmed"                   # model down: geometry plus pixels still stand
     if tri.verdict == "intentional" and tri.confidence >= 0.7:

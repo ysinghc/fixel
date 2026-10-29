@@ -40,6 +40,14 @@ def test_occlusion_accepts_either_sam_spill_or_diff():
     assert not observable(cand("occlusion", [1, 2], 320), px(False))
 
 
+def test_occlusion_observable_when_sam_cannot_see_a_distinct_object():
+    # spike 1: box-prompt confidence was 0.98 for every clear button and 0.42-0.61 for every covered one
+    c = cand("occlusion", [1, 2], 320)
+    assert observable(c, PixelEvidence(sam_conf=0.52, observable=False))
+    assert not observable(c, PixelEvidence(sam_conf=0.98, observable=False))
+    assert not observable(cand("collision", [1, 2], 320), PixelEvidence(sam_conf=0.3, observable=False))   # collisions: diff only
+
+
 def test_decide_policy():
     c = cand("collision", [1, 2], 320)
     assert decide(c, px(False), None) == "not_observable"
@@ -93,3 +101,9 @@ def test_triage_dismissal_applies_per_finding():
     key = fuse(items)[0].key
     (f,) = fuse(items, {key: tri("intentional", 0.95)})
     assert f.status == "dismissed" and f.triage.verdict == "intentional"
+
+
+def test_transient_candidates_are_dismissed_by_code_without_triage():
+    c = Candidate(type="collision", state_key="/|320", tile=0, elements=[1, 2], metrics={"transient": 1.0})
+    assert decide(c, px(True, diff=0.5), None) == "dismissed"
+    assert decide(c, px(False), None) == "not_observable"                # unseen overlaps stay not_observable

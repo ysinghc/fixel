@@ -36,6 +36,7 @@ class Tile(BaseModel):
 class Capture(BaseModel):
     state: StateSpec
     vw: int; vh: int; doc_w: int
+    doc_h: int = 0                                # document height, for scroll reachability
     tiles: list[Tile]
     axe: list[dict]
 
@@ -51,8 +52,9 @@ class Candidate(BaseModel):
 
 class PixelEvidence(BaseModel):
     sam_fill: float | None = None                 # mask area inside the DOM box / box area
-    sam_spill: float | None = None                # mask area outside the box / mask area
+    sam_spill: float | None = None                # share of the returned bounds outside the DOM box (mask-based once the parser is installed)
     sam_conf: float | None = None
+    sam_iou: float | None = None                  # IoU of the returned bounds with the prompted DOM box
     opacity_diff: float | None = None             # share of overlap pixels that change when B is hidden
     observable: bool
 

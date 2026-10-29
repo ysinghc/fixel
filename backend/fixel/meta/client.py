@@ -25,12 +25,19 @@ def mode() -> str:
     return m
 
 
+def api_key() -> str:
+    """MODEL_API_KEY, or META_MODEL_API (the name some environments store the Meta key under)."""
+    for name in ("MODEL_API_KEY", "META_MODEL_API"):
+        if os.environ.get(name):
+            return os.environ[name]
+    raise KeyError("set MODEL_API_KEY (or META_MODEL_API) to call a model live")
+
+
 def get_client() -> AsyncOpenAI:
     """Created lazily so replay and offline runs need no API key. A local Glimmer server only changes the base URL."""
     global _client
     if _client is None:
-        _client = AsyncOpenAI(base_url=os.environ.get("MODEL_BASE_URL", "https://api.meta.ai/v1"),
-                              api_key=os.environ["MODEL_API_KEY"])
+        _client = AsyncOpenAI(base_url=os.environ.get("MODEL_BASE_URL", "https://api.meta.ai/v1"), api_key=api_key())
     return _client
 
 

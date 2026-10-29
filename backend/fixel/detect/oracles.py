@@ -36,6 +36,45 @@ def is_stacked(a: Element, b: Element, by_id: dict[int, Element]) -> bool:
     return False
 
 
+def pinned_root(e: Element, by_id: dict[int, Element]) -> Element | None:
+    """The element itself or the nearest ancestor that is position: fixed or sticky (stays put while scrolling)."""
+    for x in (e, *(by_id[a] for a in ancestors(e, by_id))):
+        if x.style["position"] in ("fixed", "sticky"):
+            return x
+    return None
+
+
+def scrolls_clear(cap: Capture, tile: Tile, flow: Element, pinned: Element) -> bool:
+    """Can the user scroll so `flow` is on screen and not under `pinned`? Vertical scroll only moves `flow`, so it is
+    enough to test the scroll positions where an edge of `flow` meets an edge of `pinned`, plus the two ends."""
+    max_scroll = max(0, cap.doc_h - cap.vh)
+    top, bottom = flow.rect[1] + tile.scroll_y, flow.rect[3] + tile.scroll_y        # document coordinates
+    p_top, p_bottom = pinned.rect[1], pinned.rect[3]                                # fixed in the viewport
+    edges = {0, max_scroll, bottom - p_top, top - p_bottom}
+    for sy in {min(max_scroll, max(0, round(e + d))) for e in edges for d in (-1, 0, 1)}:
+        v_top, v_bottom = top - sy, bottom - sy
+        if v_bottom > 0 and v_top < cap.vh and (v_bottom <= p_top or v_top >= p_bottom):
+            return True
+    return False
+
+
+def is_transient(cap: Capture, tile: Tile, c: Candidate) -> bool:
+    """A collision or occlusion between a fixed/sticky element and in-flow content that the user can scroll apart
+    (a sticky nav over content scrolled under it) is by design. One that cannot be scrolled clear (a cookie banner
+    over the last button) is not."""
+    if c.type not in ("collision", "occlusion") or cap.doc_h <= 0:
+        return False
+    by_id = {e.id: e for e in tile.elements}
+    els = [by_id[i] for i in c.elements if i in by_id]
+    if len(els) != 2:
+        return False
+    roots = [pinned_root(e, by_id) for e in els]
+    if (roots[0] is None) == (roots[1] is None):
+        return False                                        # both pinned or neither: scrolling does not separate them
+    pinned, flow = (roots[0], els[1]) if roots[0] else (roots[1], els[0])
+    return scrolls_clear(cap, tile, flow, pinned)
+
+
 def is_visual_container(p: Element) -> bool:
     bg = p.style["backgroundColor"]
     border = float(p.style["borderTopWidth"].removesuffix("px") or 0)
@@ -131,18 +170,39 @@ def small_targets(tile: Tile, min_px: float = 24):
             and not (e.tag == "a" and by_id.get(e.parent) and by_id[e.parent].text)]
 
 
+def on_screen(cap: Capture, e: Element) -> bool:
+    """Any part of the element lies inside the viewport shot (the snapshot also lists everything off-screen)."""
+    return e.rect[2] > 0 and e.rect[0] < cap.vw and e.rect[3] > 0 and e.rect[1] < cap.vh
+
+
 def contrast(cap: Capture):
-    """axe-core color-contrast violations, mapped to the last tile's element ids."""
-    last = len(cap.tiles) - 1
-    return [Candidate(type="contrast", state_key=cap.state.key, tile=last, elements=[int(a["fixel"])],
-                      metrics={}) for a in cap.axe if a.get("fixel") is not None]
+    """axe-core color-contrast violations, placed in the first tile where the element is on screen."""
+    out = []
+    for a in cap.axe:
+        if a.get("fixel") is None:
+            continue
+        i = int(a["fixel"])
+        for t, tile in enumerate(cap.tiles):
+            e = next((x for x in tile.elements if x.id == i), None)
+            if e and on_screen(cap, e):
+                out.append(Candidate(type="contrast", state_key=cap.state.key, tile=t, elements=[i], metrics={}))
+                break
+    return out
 
 
 def run_oracles(cap: Capture) -> list[Candidate]:
-    """All geometry oracles over every tile, stamped with the state key and tile index."""
+    """All geometry oracles over every tile, stamped with the state key and tile index. A candidate is kept only in
+    tiles where all its elements are on screen, so a long page does not report (or triage) the same thing off-screen."""
     out: list[Candidate] = []
     for i, tile in enumerate(cap.tiles):
+        by_id = {e.id: e for e in tile.elements}
         found = [*viewport_protrusion(cap, tile), *collisions(tile), *clipped_text(tile),
                  *element_protrusion(tile), *occlusions(tile), *small_targets(tile)]
-        out += [c.model_copy(update={"state_key": cap.state.key, "tile": i}) for c in found]
+        for c in found:
+            if not all(on_screen(cap, by_id[x]) for x in c.elements if x in by_id):
+                continue
+            c = c.model_copy(update={"state_key": cap.state.key, "tile": i})
+            if is_transient(cap, tile, c):
+                c.metrics["transient"] = 1.0                # fuse() dismisses these in code, no model call spent
+            out.append(c)
     return out + contrast(cap)

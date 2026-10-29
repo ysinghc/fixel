@@ -112,3 +112,47 @@ def test_candidates_are_stamped_with_state_and_tile(snap):
     cap = snap(RESET + '<div style="width:600px;height:40px"><p>wide</p></div>')
     for c in run_oracles(cap):
         assert c.state_key == cap.state.key and c.tile >= 0
+
+
+# --- transient (scrollable apart) ---------------------------------------------------------
+STICKY_NAV = '<nav style="position:sticky;top:0;height:56px;background:#fff"><span>Site name</span></nav>'
+
+
+def test_sticky_nav_over_scrolled_content_is_transient(snap):
+    # 3 screens of content: scroll the page to the end and the footer link sits under the nav only transiently
+    # the link lands at y=15 in the third 600px tile, under the nav's text
+    html = RESET + STICKY_NAV + '<div style="height:1159px"></div><a href="#" style="display:block">Footer link text</a><div style="height:900px"></div>'
+    cap = snap(html, width=375, height=600)
+    hits = [c for c in run_oracles(cap) if c.type == "collision"]
+    assert hits and all(c.metrics.get("transient") for c in hits) and cap.doc_h > 2000
+
+
+def test_cookie_banner_over_last_button_is_not_transient(snap):
+    html = RESET + ('<div style="height:480px"></div><button style="width:140px;height:44px">Checkout</button>'
+                    '<div style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#333;z-index:50">cookies</div>')
+    cands = run_oracles(snap(html, width=375, height=560))
+    occ = [c for c in cands if c.type == "occlusion"]
+    assert occ and not any(c.metrics.get("transient") for c in occ)      # no scroll position clears the final button
+
+
+def test_fixed_banner_over_mid_page_content_is_transient(snap):
+    html = RESET + ('<div style="height:300px"></div><button style="width:140px;height:44px">Mid page</button>'
+                    '<div style="height:1200px"></div>'
+                    '<div style="position:fixed;left:0;right:0;bottom:0;height:200px;background:#333;z-index:50"></div>')
+    occ = [c for c in run_oracles(snap(html, width=375, height=500)) if c.type == "occlusion"]
+    assert occ and all(c.metrics.get("transient") for c in occ)          # scroll the button above the banner
+
+
+# --- on-screen filtering ------------------------------------------------------------------
+def test_candidates_are_reported_only_in_tiles_where_the_element_is_on_screen(snap):
+    # a 16px button 1500px down a page: it must be reported in the tile that shows it, not in the 6 others
+    html = RESET + '<div style="height:1500px"></div><button style="width:16px;height:16px;padding:0"></button><div style="height:600px"></div>'
+    cap = snap(html, width=375, height=600)
+    tiles = {c.tile for c in run_oracles(cap) if c.type == "small_target"}
+    assert tiles == {2}                                         # y=1500 is inside the third 600px tile (1200-1800)
+
+
+def test_contrast_is_placed_in_the_tile_that_shows_the_element(snap):
+    html = RESET + '<div style="height:1300px"></div><p style="color:#bbb;background:#fff">Barely readable</p><div style="height:600px"></div>'
+    cap = snap(html, width=375, height=600)
+    assert [c.tile for c in run_oracles(cap) if c.type == "contrast"] == [2]
