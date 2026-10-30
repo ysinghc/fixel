@@ -37,7 +37,7 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 
 The scan-to-verified-fix loop works end to end. `fixel scan` detects (geometry oracles, opacity diff, SAM 3.1, Spark triage, fusion) and `fixel fix` repairs: an isolated git worktree, a Wonder tool-calling agent whose edits pass the symptom-hiding linter, and a model-free verifier over the whole width x theme matrix. Verified live on all three planted defects of `targets/demo-shop` (see `docs/SPIKES.md`).
 
-Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: no data-loc yet); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
+Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: data-loc via the webpack loader); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
 
 Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `bench/` (mutations, corpus, metrics, ablations), `explore/cua.py`, `meta/{voice,image,spark}.py`. Next in the build plan (guide section 13): API and event stream, then the UI, then the benchmark and human labelling.
 
@@ -67,6 +67,8 @@ Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `benc
 - **The verifier's line remap is exact** (old->new line map from each hunk's context, so elements on trailing context lines inside a hunk are remapped too; the guide only shifts lines after a hunk). Drift lets ancestors of the fixed region grow taller (their content grew) while still flagging sideways movement; the fix container is everything under the parent of the finding's nearest common ancestor.
 - **Finding keys must be stable under small layout shifts.** An occlusion names its coverer by its fixed/sticky root (not the inner element a sample point hit), and a collision already explained by an occlusion is dropped. Without this the same cookie-banner defect appeared "new" after an unrelated patch and pushed the model into scope creep.
 - **Oracle gaps found by tests:** text spilling out of a narrow box now counts as viewport protrusion; protruding siblings are reported once as their protruding parent.
+
+- **data-loc for Next.js** (`tooling/next-data-loc.cjs` + `next-data-loc-loader.cjs`, set up by `target.py:build_env` through `NODE_OPTIONS`): Next has no `--config` flag, so a Node preload wraps `loadConfig` from `next/dist/server/config` and adds a pre-loader rule to the config's `webpack()` hook. Hooking the *result* of `loadConfig` is deliberate: Next loads the user's config with a native `import()`, and Node's ESM bridge ignores anything a patched `Module._load` returns for it, so wrapping the user's module does not work. The loader falls back to the original source (with a webpack warning) on a parse error, so it cannot break a target's build.
 
 ## Build order and cut order
 

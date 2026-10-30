@@ -1,7 +1,9 @@
 """Start and stop the target app's dev server for a scan (guide sections 2 and 7.1).
 
-Vite targets are run through tooling/vite.config.fixel.mjs, a wrapper that loads the target's own
-config and prepends the data-loc plugin, so the target's files are never edited.
+The data-loc source-location stamp is injected without editing the target:
+  * Vite apps run through tooling/vite.config.fixel.mjs, which loads the target's own config and prepends a plugin;
+  * Next.js apps get a Node preload (tooling/next-data-loc.cjs, via NODE_OPTIONS) that wraps Next's own config loader
+    and adds a webpack pre-loader to the config it returns. Next has no --config flag, so a preload is the way in.
 """
 import asyncio
 import os
@@ -15,9 +17,12 @@ from .config import Target
 
 FIXEL_HOME = Path(__file__).resolve().parents[2]
 VITE_CONFIGS = ("vite.config.ts", "vite.config.mts", "vite.config.js", "vite.config.mjs")
+NEXT_CONFIGS = ("next.config.js", "next.config.cjs", "next.config.mjs", "next.config.ts")
+NEXT_PRELOAD = FIXEL_HOME / "tooling" / "next-data-loc.cjs"
 
 # Default for targets that do not set dev_cmd: a Vite app run through the data-loc wrapper config.
 DEFAULT_VITE_CMD = "npx vite --config {fixel_home}/tooling/vite.config.fixel.mjs --port {port} --strictPort"
+DEFAULT_NEXT_CMD = "npx next dev -p {port} -H 127.0.0.1"
 
 
 def free_port() -> int:
@@ -28,6 +33,25 @@ def free_port() -> int:
 
 def find_vite_config(root: Path) -> Path | None:
     return next((root / n for n in VITE_CONFIGS if (root / n).exists()), None)
+
+
+def find_next_config(root: Path) -> Path | None:
+    return next((root / n for n in NEXT_CONFIGS if (root / n).exists()), None)
+
+
+def build_env(target: Target, root: Path) -> tuple[dict[str, str], str, list[str]]:
+    """(environment, default dev command, notes) for a target rooted at `root`."""
+    env = {**os.environ, "FIXEL": "1", "FIXEL_HOME": str(FIXEL_HOME), **target.env}
+    notes: list[str] = []
+    vite, nxt = find_vite_config(root), find_next_config(root)
+    cmd = DEFAULT_VITE_CMD
+    if vite:
+        env.setdefault("FIXEL_TARGET_CONFIG", str(vite))
+    elif nxt:
+        cmd = DEFAULT_NEXT_CMD
+        env["FIXEL_APP_ROOT"] = str(root)
+        env["NODE_OPTIONS"] = f"--require {NEXT_PRELOAD} {env.get('NODE_OPTIONS', '')}".strip()
+    return env, cmd, notes
 
 
 async def wait_http(url: str, timeout: float = 90, alive=lambda: True) -> None:
@@ -52,17 +76,14 @@ class TargetServer:
     """async with TargetServer(target) as base_url: ... starts target.dev_cmd and stops its process group on exit."""
 
     def __init__(self, target: Target, timeout: float = 90):
-        self.target, self.timeout, self.proc = target, timeout, None
+        self.target, self.timeout, self.proc, self.notes = target, timeout, None, []
 
     async def __aenter__(self) -> str:
         t = self.target
         root = Path(t.path or ".").resolve()
         port = free_port()
-        cmd = (t.dev_cmd or DEFAULT_VITE_CMD).format(port=port, fixel_home=FIXEL_HOME)
-        env = {**os.environ, "FIXEL": "1", "FIXEL_HOME": str(FIXEL_HOME), **t.env}
-        cfg = find_vite_config(root)
-        if cfg and "FIXEL_TARGET_CONFIG" not in env:
-            env["FIXEL_TARGET_CONFIG"] = str(cfg)
+        env, default_cmd, self.notes = build_env(t, root)
+        cmd = (t.dev_cmd or default_cmd).format(port=port, fixel_home=FIXEL_HOME)
         self.log = Path(".fixel/logs") / f"{t.name}.log"
         self.log.parent.mkdir(parents=True, exist_ok=True)
         with self.log.open("wb") as out:

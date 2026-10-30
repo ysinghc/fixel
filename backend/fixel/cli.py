@@ -29,8 +29,11 @@ async def run_scan(conf: cfg.Config, states, base_url: str | None, progress, mod
     if base_url:
         results = await scan_states(states, base_url, store, par, progress, sam=models)
     else:
-        async with TargetServer(conf.target) as url:
+        server = TargetServer(conf.target)
+        async with server as url:
             print(f"started {conf.target.name} at {url}")
+            for note in server.notes:
+                print(f"  note: {note}")
             results = await scan_states(states, url, store, par, progress, sam=models)
     triage = {}
     if models:
