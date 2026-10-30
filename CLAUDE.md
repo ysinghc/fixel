@@ -37,7 +37,7 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 
 The scan-to-verified-fix loop works end to end. `fixel scan` detects (geometry oracles, opacity diff, SAM 3.1, Spark triage, fusion) and `fixel fix` repairs: an isolated git worktree, a Wonder tool-calling agent whose edits pass the symptom-hiding linter, and a model-free verifier over the whole width x theme matrix. Verified live on all three planted defects of `targets/demo-shop` (see `docs/SPIKES.md`).
 
-Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/` (submodules plus the vendored `demo-shop`).
+Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: no data-loc yet); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
 
 Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `bench/` (mutations, corpus, metrics, ablations), `explore/cua.py`, `meta/{voice,image,spark}.py`. Next in the build plan (guide section 13): API and event stream, then the UI, then the benchmark and human labelling.
 

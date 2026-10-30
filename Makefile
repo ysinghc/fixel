@@ -10,6 +10,8 @@ targets:
 	cd targets/iiitu-acm/client && npm ci
 	cd targets/pastebin/frontend && npm ci
 	cd targets/aavesh/client && npm ci
+	cd targets/e-broker && npm ci
+	cd targets/demo-shop && npm ci
 
 test:
 	pytest

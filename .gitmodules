@@ -7,3 +7,6 @@
 [submodule "targets/aavesh"]
 	path = targets/aavesh
 	url = https://github.com/ysinghc/aavesh
+[submodule "targets/e-broker"]
+	path = targets/e-broker
+	url = https://github.com/ysinghc/e-broker

@@ -1,0 +1,18 @@
+# Test split. Next.js 14 (App Router) + React 18 + Tailwind 3 + TypeScript; MIT, author's own code.
+# Not a Vite app: there is no data-loc injection yet, so findings are keyed by element fingerprint
+# (tag#text-hash) instead of source location. Only the public routes are scanned: /dashboard, /vendor and
+# /admin need a login against the FastAPI backend, and /result/[id] needs a scan id.
+# The backend is not running, so data-driven parts render their empty/error states; placeholder secrets
+# let NextAuth start and the API URLs point at nothing.
+target:
+  name: e-broker
+  path: targets/e-broker
+  dev_cmd: "npx next dev -p {port} -H 127.0.0.1"
+  build_cmd: "npm run build"
+  env:
+    NEXTAUTH_SECRET: fixel-scan-only
+    AUTH_SECRET: fixel-scan-only
+    NEXT_PUBLIC_API_URL: "http://127.0.0.1:9"
+    INTERNAL_API_URL: "http://127.0.0.1:9"
+    NEXT_TELEMETRY_DISABLED: "1"
+routes: [/, /recyclers, /scan, /auth/login, /auth/register]
