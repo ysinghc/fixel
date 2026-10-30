@@ -1,0 +1,8 @@
+# Planted-defect demo app, authored for Fixel (MIT, no external code). React 19 + Vite 8 + Tailwind 4.
+# Defects: PriceCard has a fixed 480px width, Perks is a non-wrapping chip row, CookieBanner covers the Checkout button.
+target:
+  name: demo-shop
+  path: targets/demo-shop
+routes: [/]
+matrix:
+  height: 600          # a phone-sized viewport, so the cookie banner can cover the last button

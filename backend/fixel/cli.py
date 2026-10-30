@@ -12,11 +12,14 @@ from pathlib import Path
 
 from . import config as cfg
 from .env import load_dotenv
-from .models import Triage
+from .fix.agent import FixLLM, fix_finding
+from .fix.worktree import Workspace, slug
+from .models import Finding, Triage
 from .scan import (Scanned, findings_of, models_available, scan_states, serve_static,  # noqa: F401 (re-exported)
                    triage_findings, warn_once)
 from .store import ArtifactStore
 from .target import TargetServer
+from .verify.matrix import matrix_states, scan_baseline
 
 
 async def run_scan(conf: cfg.Config, states, base_url: str | None, progress, models: bool = False
@@ -79,6 +82,94 @@ def cmd_scan(args) -> int:
     return 0
 
 
+def print_event(ev: dict) -> None:
+    """Stream the agent's work to the terminal."""
+    t = ev["type"]
+    if t == "fix.tool":
+        a = ev["args"]
+        detail = a.get("path") or a.get("pattern") or a.get("feature") or a.get("summary") or ""
+        print(f"  -> {ev['name']} {str(detail)[:90]}")
+    elif t == "fix.patch" and ev["lint"]:
+        print("     BLOCKED by the linter: " + "; ".join(ev["lint"])[:160])
+    elif t == "fix.verify":
+        print(f"     verify {ev['item']:<17} {'ok' if ev['ok'] else 'FAILED'}")
+    elif t == "fix.model_fallback":
+        print(f"  !! {ev['from']} unavailable ({ev['reason']}); continuing on {ev['to']}")
+
+
+def pick_finding(findings: list[Finding], selector: str | None, index: int | None) -> Finding | None:
+    todo = [f for f in findings if f.status == "confirmed"]
+    if index is not None:
+        return todo[index - 1] if 1 <= index <= len(todo) else None
+    if selector:
+        hits = [f for f in todo if selector in f.key]
+        return hits[0] if hits else None
+    return todo[0] if todo else None
+
+
+async def run_fix(conf: cfg.Config, args) -> int:
+    store = ArtifactStore()
+    route = (args.route or conf.routes)[0]
+    states = matrix_states(route, conf.matrix)
+    async with await Workspace.open(conf.target, f"fix|{route}|{args.finding or args.index or 0}") as ws:
+        print(f"worktree {ws.path} ({conf.target.name} at HEAD), serving {ws.url}")
+        print(f"baseline scan of {route}: {len(states)} states (model-free)")
+        base = await scan_baseline(ws, states, store, conf.concurrency.browser_contexts)
+        findings = findings_of(base)
+        confirmed = [f for f in findings if f.status == "confirmed"]
+        for i, f in enumerate(confirmed, 1):
+            print(f"  {i:>2}. {f.type:<20} {' + '.join(f.locs) or f.key.split('|', 1)[1]:<48} {f.widths[0]}-{f.widths[-1]}px")
+        if args.list:
+            return 0
+        f = pick_finding(findings, args.finding, args.index)
+        if f is None:
+            print("no matching confirmed finding" if confirmed else "no confirmed findings to fix")
+            return 1
+        if models_available() and not args.offline:
+            f = f.model_copy(update={"triage": (await triage_findings(base, [f], store, conf.models.triage)).get(f.key)})
+        print(f"\nfixing {f.key} with {args.model}")
+        res = await fix_finding(f, ws, base, store, emit=_async(print_event), llm=FixLLM(args.model, conf.models.fixer_fallback,
+                                                                                    emit=_async(print_event)))
+    out = Path(args.out or f".fixel/fixes/{time.strftime('%Y%m%d-%H%M%S')}")
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "result.json").write_text(json.dumps({"status": res.status, "model": res.model, "summary": res.summary, "turns": res.turns,
+                                                  "tokens": res.tokens, "finding": f.key, "citations": res.citations,
+                                                  "attempts": [a.model_dump() for a in res.attempts]}, indent=1))
+    print(f"\n{res.status.upper()} on {res.model} after {res.turns} turns, {res.tokens} tokens (live calls only)")
+    if res.summary:
+        print(f"model: {res.summary[:300]}")
+    if res.verification:
+        v = res.verification
+        print(f"verification: target gone {v.target_gone}, new findings {v.new_findings or 'none'}, drift {v.drifted or 'none'}, "
+              f"build {v.build_ok}, lint {v.lint_ok}")
+        for n in v.notes:
+            print(f"  note: {n[:200]}")
+    if res.status == "verified":
+        patch = out / f"{slug(f.key)}.patch"
+        patch.write_text(res.diff)
+        print(f"\n{res.diff}\nwrote {patch}; apply it in the app directory with `git apply {patch.resolve()}`")
+    else:
+        print("no patch exported: only a verified fix is shown as fixed")
+    return 0 if res.status == "verified" else 2
+
+
+def _async(fn):
+    async def inner(ev):
+        fn(ev)
+    return inner
+
+
+def cmd_fix(args) -> int:
+    conf = cfg.load(args.config) if Path(args.config).exists() else cfg.Config()
+    if args.widths:
+        conf.matrix.widths = args.widths
+    if args.themes:
+        conf.matrix.themes = args.themes
+    if args.stress:
+        conf.matrix.text_stress = args.stress
+    return asyncio.run(run_fix(conf, args))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fixel")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -93,6 +184,19 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--offline", action="store_true", help="no model calls (SAM, Spark): geometry + opacity diff only")
     sc.add_argument("--out")
     sc.set_defaults(fn=cmd_scan)
+    fx = sub.add_parser("fix", help="fix one finding in an isolated worktree; export a patch only if the verifier passes")
+    fx.add_argument("--config", default="fixel.yaml")
+    fx.add_argument("--route", action="append", help="the route to fix (default: the first configured route)")
+    fx.add_argument("--list", action="store_true", help="scan and list the confirmed findings, then exit")
+    fx.add_argument("--index", type=int, help="fix the Nth confirmed finding (1-based, as listed)")
+    fx.add_argument("--finding", help="fix the first confirmed finding whose key contains this text")
+    fx.add_argument("--model", default="muse-wonder-1.0")
+    fx.add_argument("--widths", type=int, nargs="+", help="restrict the verification matrix (faster, weaker)")
+    fx.add_argument("--themes", nargs="+")
+    fx.add_argument("--stress", nargs="+")
+    fx.add_argument("--offline", action="store_true", help="skip the Spark description (the fix model still needs the API)")
+    fx.add_argument("--out")
+    fx.set_defaults(fn=cmd_fix)
     args = ap.parse_args(argv)
     load_dotenv()                                   # MODEL_API_KEY etc. from .env; real environment variables win
     return args.fn(args)

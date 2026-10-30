@@ -86,12 +86,23 @@ def viewport_protrusion(cap: Capture, tile: Tile):
         return []
     by_id = {e.id: e for e in tile.elements}
     scrollers = {e.id for e in tile.elements if e.style["overflowX"] in ("auto", "scroll")}
-    over = [e for e in tile.elements if e.rect[2] > cap.vw + 1
+    def right(e: Element) -> float:                      # text spilling out of a narrow box counts, not only the box
+        return max(e.rect[2], e.text_rect[2]) if e.text_rect else e.rect[2]
+
+    over = [e for e in tile.elements if right(e) > cap.vw + 1
             and not any(a in scrollers for a in ancestors(e, by_id))]   # inside a scroller is fine
     parents_of_over = {e.parent for e in over}
-    # report the deepest culprits: protruding elements with no protruding child
-    return [cand("viewport_protrusion", tile, [e.id], overflow_px=e.rect[2] - cap.vw)
-            for e in over if e.id not in parents_of_over]
+    over_ids = {e.id for e in over}
+    # report the deepest culprits: protruding elements with no protruding child ...
+    deepest = [e for e in over if e.id not in parents_of_over]
+    by_parent: dict[int | None, list[Element]] = defaultdict(list)
+    for e in deepest:
+        by_parent[e.parent].append(e)
+    culprits: list[Element] = []
+    for pid, group in by_parent.items():
+        # ... but when several siblings protrude because their parent does, the parent is the one thing to fix
+        culprits += [by_id[pid]] if len(group) >= 2 and pid in over_ids else group
+    return [cand("viewport_protrusion", tile, [e.id], overflow_px=right(e) - cap.vw) for e in culprits]
 
 
 def collisions(tile: Tile, min_px: float = 24, cell: int = 64):

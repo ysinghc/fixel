@@ -156,3 +156,18 @@ def test_contrast_is_placed_in_the_tile_that_shows_the_element(snap):
     html = RESET + '<div style="height:1300px"></div><p style="color:#bbb;background:#fff">Barely readable</p><div style="height:600px"></div>'
     cap = snap(html, width=375, height=600)
     assert [c.tile for c in run_oracles(cap) if c.type == "contrast"] == [2]
+
+
+# --- grouping protruding siblings under their parent ---------------------------------------
+def test_siblings_that_protrude_because_their_parent_does_are_reported_once_as_the_parent(snap):
+    html = RESET + ('<div id="card" style="width:600px;background:#eee"><h2>Title</h2><p>One paragraph</p><p>Another paragraph</p></div>')
+    cap = snap(html, width=375)
+    hits = [c for c in run_oracles(cap) if c.type == "viewport_protrusion"]
+    by_id = {e.id: e for e in cap.tiles[0].elements}
+    assert len(hits) == 1 and [by_id[i].tag for i in hits[0].elements] == ["div"]      # the card, not its three children
+
+
+def test_a_single_protruding_child_is_still_the_culprit(snap):
+    html = RESET + '<div style="width:300px"><p style="white-space:nowrap">A long unbroken line of text that cannot wrap and runs past the edge</p></div>'
+    hits = [c for c in run_oracles(snap(html, width=375)) if c.type == "viewport_protrusion"]
+    assert len(hits) == 1
