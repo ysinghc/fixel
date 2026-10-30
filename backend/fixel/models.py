@@ -82,6 +82,8 @@ class Verification(BaseModel):
     drifted: list[str]
     build_ok: bool
     lint_ok: bool
+    grid: dict[str, bool] = {}                    # state key -> the target finding is gone in that state
+    notes: list[str] = []                         # build output tail, lint errors: what to show when something fails
     @property
     def passed(self) -> bool:
         return self.target_gone and not self.new_findings and not self.drifted and self.build_ok and self.lint_ok

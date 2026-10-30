@@ -11,6 +11,7 @@ class Target(BaseModel):
     name: str = "app"
     path: str | None = None
     dev_cmd: str | None = None
+    build_cmd: str | None = "npm run build"       # run in the fix worktree by the verifier; None skips the build check
     base_url: str = "http://localhost:5173"
     env: dict[str, str] = {}
 
