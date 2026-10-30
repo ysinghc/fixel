@@ -149,3 +149,30 @@ export type Family = 'sam' | 'spark' | 'wonder' | 'grounding' | 'voice'
 
 /** One event from the stream; every event has a type and the sequence number the server gave it. */
 export interface Ev { type: string; seq: number; [k: string]: any } // eslint-disable-line @typescript-eslint/no-explicit-any
+
+// ---------------------------------------------------------------------------------------------------- benchmark
+export type BenchLabelValue = 'visible_defect' | 'no_visible_defect' | 'unsure'
+export interface Rate { k: number; n: number; p: number; lo: number; hi: number }
+export interface BenchRunRow { run: string; split: string | null; mode: string | null; n_cases: number; levels: string[]; usd: number | null; created: number; labelled: number; queue: number | null }
+export interface BenchList { available: boolean; reason?: string | null; runs: BenchRunRow[] }
+export interface QueueItem { id: string; n: number; route: string; width: number; height: number; theme: string; text_stress: string; target: string; tiles: string[]; label: BenchLabelValue | null }
+export interface BenchQueue { run: string; split: string | null; question: string; items: QueueItem[]; done: number }
+export interface HumanLevel {
+  confusion: { tp: number; fp: number; fn: number; tn: number }
+  precision: Rate | null; recall: Rate | null; clean_false_positive_rate: Rate | null
+  precision_by_type: Record<string, Rate | null>; injected_recall_by_op: Record<string, Rate | null>
+}
+export interface BenchMetrics {
+  run: string
+  meta: { split?: string; seed?: number; mode?: string; targets?: string[]; code?: { commit: string | null; dirty: boolean | null }; usd?: number; seconds?: number }
+  levels: string[]
+  n_cases: number; n_mutated: number; n_clean: number
+  construction: Record<string, Record<string, Rate | null>>
+  injected_agreement: Record<string, Record<string, Rate | null>>
+  localization: Record<string, Rate | null>
+  labels: { n: number; visible_defect: number; no_visible_defect: number; unsure: number }
+  human: Record<string, HumanLevel> | null
+  headline: boolean
+  caveats: string[]
+  cost: { usd: number | null; model_calls: { live: number; cached: number } | null; seconds: number | null; usd_per_case: number | null; seconds_per_case: number | null }
+}

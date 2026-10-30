@@ -73,7 +73,7 @@ async def capture_page(page: Page, s: StateSpec, store: ArtifactStore, max_tiles
         occ = await page.evaluate(OCCLUSION_JS)
         tiles.append(Tile(scroll_y=y, png_sha=store.put(png), elements=snap["elements"], occlusion=occ))
     axe = await run_axe(page)
-    return Capture(state=s, vw=snap["vw"], vh=snap["vh"], doc_w=snap["doc_w"], doc_h=doc_h, tiles=tiles, axe=axe)
+    return Capture(state=s, vw=snap["vw"], vh=snap["vh"], doc_w=snap["doc_w"], doc_h=doc_h, root_clip=bool(snap.get("root_clip")), tiles=tiles, axe=axe)
 
 
 async def capture(ctx: BrowserContext, base_url: str, s: StateSpec, store: ArtifactStore,

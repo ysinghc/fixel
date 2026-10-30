@@ -1,4 +1,4 @@
-.PHONY: install targets test web web-dev serve demo-smoke
+.PHONY: install targets test web web-dev serve bench-dev demo-smoke
 
 install:
 	pip install -e ".[dev]"
@@ -26,6 +26,11 @@ targets:
 
 test:
 	pytest
+
+# Benchmark on the development split (tuning only; never a result). The test split is run once, then labelled in the UI:
+#   fixel bench run --split test --mutated 150 --clean 50 ; make serve ; label in the Label tab ; fixel bench export <run>
+bench-dev:
+	fixel bench run --split dev --mutated 60 --clean 20
 
 # Runs the demo path from the cache with the network off (guide section 14.1).
 demo-smoke:

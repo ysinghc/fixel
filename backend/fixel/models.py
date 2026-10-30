@@ -37,6 +37,7 @@ class Capture(BaseModel):
     state: StateSpec
     vw: int; vh: int; doc_w: int
     doc_h: int = 0                                # document height, for scroll reachability
+    root_clip: bool = False                       # html or body has overflow-x hidden/clip: sideways overflow is cut off, not scrollable
     tiles: list[Tile]
     axe: list[dict]
 

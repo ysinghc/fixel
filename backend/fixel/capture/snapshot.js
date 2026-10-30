@@ -2,7 +2,7 @@
 () => {
   const INTERACTIVE = 'a[href],button,input,select,textarea,summary,[role=button],[role=link],[tabindex]:not([tabindex="-1"])';
   const KEEP = ['position','display','overflowX','overflowY','whiteSpace','textOverflow','zIndex',
-                'fontSize','color','backgroundColor','borderTopWidth','pointerEvents','opacity'];
+                'fontSize','color','backgroundColor','borderTopWidth','pointerEvents','opacity','flexWrap','flexDirection'];
   document.querySelectorAll('[data-fixel-id]').forEach(e => e.removeAttribute('data-fixel-id'));
   const out = []; let id = 0;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
@@ -33,5 +33,7 @@
       style, scroll: [el.scrollWidth, el.clientWidth, el.scrollHeight, el.clientHeight],
     });
   }
-  return { vw: innerWidth, vh: innerHeight, doc_w: document.documentElement.scrollWidth, elements: out };
+  const clip = e => ['hidden', 'clip'].includes(getComputedStyle(e).overflowX);
+  return { vw: innerWidth, vh: innerHeight, doc_w: document.documentElement.scrollWidth,
+           root_clip: clip(document.documentElement) || clip(document.body), elements: out };
 }

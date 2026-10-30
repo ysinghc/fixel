@@ -45,6 +45,14 @@ def test_invisible_overlap_is_not_observable(evidence):
     assert results and all(not px.observable for _, px in results)
 
 
+def test_visible_text_overlapped_by_invisible_text_is_not_observable(evidence):
+    # found by the benchmark's invisible_overlap control: only one side paints, so nothing visibly collides
+    html = RESET + ('<p style="margin:0">Overlapping line one</p>'
+                    '<p style="margin:-14px 0 0;color:transparent">Overlapping line two</p>')
+    results = evidence(html, "collision")
+    assert results and all(not px.observable for _, px in results)
+
+
 def test_banner_over_button_is_observable(evidence):
     html = RESET + ('<div style="height:480px"></div><button style="width:140px;height:44px">Checkout</button>'
                     '<div style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#333;z-index:50"></div>')

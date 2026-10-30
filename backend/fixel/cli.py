@@ -183,6 +183,23 @@ def cmd_serve(args) -> int:
     return 0
 
 
+def cmd_bench(args) -> int:
+    from .bench import metrics, run_bench as rb
+    if args.bench_cmd == "run":
+        levels = rb.LEVELS if args.models == "all" else rb.LEVELS[:2] if args.models == "none" else rb.LEVELS[:3]
+        bc = rb.BenchConfig(split=args.split, n_mutated=args.mutated, n_clean=args.clean, seed=args.seed, levels=levels,
+                            widths=args.widths, targets=args.targets, budget_usd=args.budget, ops=args.ops, parallel=args.parallel)
+        out = asyncio.run(rb.run_bench(bc))
+        print(metrics.render(metrics.compute(out)))
+        return 0
+    run = Path(args.run) if Path(args.run).exists() else rb.ROOT / args.run
+    if args.bench_cmd == "export":
+        print(f"wrote {metrics.export(run, args.dest)}")
+        return 0
+    print(metrics.render(metrics.compute(run, labels=metrics.load_labels(run) if args.labels else None)))
+    return 0
+
+
 def meta_mode() -> str:
     from .meta import client
     return client.mode()
@@ -220,6 +237,29 @@ def main(argv: list[str] | None = None) -> int:
     sv.add_argument("--port", type=int, default=8765)
     sv.add_argument("--budget", type=float, default=10.0, help="stop starting model calls for a run once it has cost this many dollars")
     sv.set_defaults(fn=cmd_serve)
+    bn = sub.add_parser("bench", help="inject known defects into corpus pages and measure detection")
+    bsub = bn.add_subparsers(dest="bench_cmd", required=True)
+    br = bsub.add_parser("run", help="run the benchmark on a split and print the report")
+    br.add_argument("--split", choices=["dev", "test"], default="dev", help="tune on dev; report test only")
+    br.add_argument("--mutated", type=int, default=60, help="mutated cases (controls included)")
+    br.add_argument("--clean", type=int, default=20, help="unmutated states (false-positive rate)")
+    br.add_argument("--seed", type=int, default=7)
+    br.add_argument("--models", choices=["none", "sam", "all"], default="all",
+                    help="none: geometry + opacity diff; sam: + SAM; all: + Spark triage (needs the API key, or replay)")
+    br.add_argument("--widths", type=int, nargs="+")
+    br.add_argument("--targets", nargs="+", help="only these target names")
+    br.add_argument("--ops", nargs="+", help="only these mutation operators")
+    br.add_argument("--budget", type=float, default=10.0)
+    br.add_argument("--parallel", type=int, default=4)
+    br.set_defaults(fn=cmd_bench)
+    bp = bsub.add_parser("report", help="print the report for a finished run (with --labels: add human-label metrics)")
+    bp.add_argument("run", help="run id or directory")
+    bp.add_argument("--labels", action="store_true")
+    bp.set_defaults(fn=cmd_bench)
+    bx = bsub.add_parser("export", help="copy a run's metrics, report, labels and per-case summary to docs/bench/<run> for committing")
+    bx.add_argument("run", help="run id or directory")
+    bx.add_argument("--dest")
+    bx.set_defaults(fn=cmd_bench)
     args = ap.parse_args(argv)
     load_dotenv()                                   # MODEL_API_KEY etc. from .env; real environment variables win
     return args.fn(args)

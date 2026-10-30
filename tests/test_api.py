@@ -211,7 +211,7 @@ def test_labels_are_validated_and_stored(live, site):
 def test_unbuilt_features_say_so_plainly(live):
     assert live.http.post("/api/voice").status_code == 501
     b = live.http.get("/api/bench").json()
-    assert b["available"] is False and "not built" in b["reason"]
+    assert b["available"] is False and "no benchmark has been run yet" in b["reason"]     # no invented numbers
 
 
 def test_a_bare_url_scan_has_nothing_to_fix(live, site):

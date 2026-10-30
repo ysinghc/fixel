@@ -2,7 +2,8 @@
 
 The opacity diff hides one element and counts how many pixels change inside a region. It is model-free,
 so the verifier can use it. Extensions beyond the guide's snippet:
-  * collisions are tested both ways (hide A, hide B), because either may be painted on top;
+  * a collision is observable only when *both* elements paint in the overlap (each is probed with the other hidden), so a
+    visible line overlapped by invisible text is not a collision, whichever of the two is on top;
   * element protrusion measures paint in the part of the child outside its parent, since there is no overlap.
 """
 import io
@@ -60,6 +61,19 @@ async def hidden_diff(page, scroll_y: int, hide_id: int, rects: list[tuple]) -> 
     return float(changed[mask].mean())
 
 
+async def paints_alone(page, scroll_y: int, hide_id: int, probe_id: int, rects: list[tuple]) -> float:
+    """Share of pixels in `rects` that change when `probe_id` is hidden while `hide_id` is already hidden:
+    does the probe paint there on its own?"""
+    sel = f'[data-fixel-id="{hide_id}"]'
+    prev = await page.evaluate(HIDE_JS, [sel, True])
+    if prev is None:
+        return 0.0
+    try:
+        return await hidden_diff(page, scroll_y, probe_id, rects)
+    finally:
+        await page.evaluate("([s, p]) => { document.querySelector(s).style.opacity = p; }", [sel, prev])
+
+
 async def opacity_diff(page, scroll_y: int, a: Element, b: Element, full_boxes: bool = False) -> float:
     """Share of A∩B pixels that change when B is made transparent; > 0 means B visibly covers A.
 
@@ -78,7 +92,9 @@ async def pixel_evidence(page, cap: Capture, c: Candidate) -> PixelEvidence:
     diff = None
     if c.type == "collision" and len(els) == 2:
         a, b = els
-        diff = max(await opacity_diff(page, tile.scroll_y, a, b), await opacity_diff(page, tile.scroll_y, b, a))
+        r = inter(box(a), box(b))
+        rects = [r] if r[2] > r[0] and r[3] > r[1] else []
+        diff = min(await paints_alone(page, tile.scroll_y, a.id, b.id, rects), await paints_alone(page, tile.scroll_y, b.id, a.id, rects))
     elif c.type == "occlusion" and len(els) == 2:
         diff = await opacity_diff(page, tile.scroll_y, els[0], els[1], full_boxes=True)   # els[1] covers
     elif c.type == "element_protrusion" and len(els) == 2:

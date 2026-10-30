@@ -13,6 +13,8 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from ..bench.labelling import QUESTION, blind_items, list_runs as list_bench_runs, queue
+from ..bench.metrics import LABELS, compute as bench_metrics_of, put_label as put_bench_label
 from ..env import load_dotenv
 from ..meta import client as meta
 from ..scan import models_available
@@ -20,7 +22,6 @@ from ..store import ArtifactStore
 from .db import DB
 from .runs import DEFAULT_BUDGET_USD, RunError, RunManager
 
-LABELS = ("visible_defect", "no_visible_defect", "unsure")
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -42,6 +43,11 @@ class FixRequest(BaseModel):
     widths: list[int] | None = None
     themes: list[str] | None = None
     stress: list[str] | None = None
+
+
+class BenchLabel(BaseModel):
+    case_id: str
+    label: str
 
 
 class LabelRequest(BaseModel):
@@ -197,9 +203,42 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
     def voice():
         raise HTTPException(501, "voice intake is not built yet")
 
+    # ------------------------------------------------------------------ the benchmark (measured results only; see bench/metrics.py)
+    bench_root = root / ".fixel" / "bench"
+
+    def bench_run(run: str) -> Path:
+        d = (bench_root / run).resolve()
+        if "/" in run or not (d / "meta.json").is_file() or bench_root.resolve() not in d.parents:
+            raise HTTPException(404, "unknown benchmark run")
+        return d
+
     @app.get("/api/bench")
     def bench():
-        return {"available": False, "reason": "the benchmark harness (mutations, corpus, human labels, ablations) is not built yet"}
+        runs = list_bench_runs(bench_root)
+        return {"available": bool(runs), "runs": runs,
+                "reason": None if runs else "no benchmark has been run yet: `fixel bench run --split dev` writes one"}
+
+    @app.get("/api/bench/{run}")
+    def bench_metrics(run: str):
+        return bench_metrics_of(bench_run(run))
+
+    @app.get("/api/bench/{run}/queue")
+    def bench_queue(run: str):
+        """The labelling queue, blind: no operator, no kind (mutated or clean) and no detection results."""
+        d = bench_run(run)
+        items = blind_items(d)
+        return {"run": run, "split": json.loads((d / "meta.json").read_text()).get("split"), "question": QUESTION, "items": items,
+                "done": sum(i["label"] is not None for i in items)}
+
+    @app.put("/api/bench/{run}/labels")
+    def bench_label(run: str, req: BenchLabel):
+        d = bench_run(run)
+        if req.case_id not in queue(d):
+            raise HTTPException(404, "that case is not in this run's labelling queue")
+        if req.label not in LABELS:
+            raise HTTPException(422, f"label must be one of {LABELS}")
+        put_bench_label(d, req.case_id, req.label)
+        return {"ok": True}
 
     # ------------------------------------------------------------------ the built UI, if there is one
     dist = Path(web_dist) if web_dist else root / "web" / "dist"

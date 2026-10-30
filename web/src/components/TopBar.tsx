@@ -103,10 +103,10 @@ export function TopBar({ config, targets }: { config: AppConfig | null; targets:
       </div>
 
       <nav className="flex items-center gap-1">
-        {(['scan', 'bench'] as const).map(v => (
+        {(['scan', 'label', 'bench'] as const).map(v => (
           <button key={v} onClick={() => useStore.getState().set({ view: v })} data-testid={`tab-${v}`}
             className={`rounded-md px-2.5 py-1 text-xs font-medium ${view === v ? 'bg-white/10 text-white' : 'text-muted hover:text-zinc-200'}`}>
-            {v === 'scan' ? 'Scan' : 'Benchmark'}
+            {v === 'scan' ? 'Scan' : v === 'label' ? 'Label' : 'Benchmark'}
           </button>
         ))}
       </nav>

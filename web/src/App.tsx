@@ -3,6 +3,7 @@ import { api, type AppConfig, type Target } from './api'
 import { BenchmarkView } from './components/BenchmarkView'
 import { FindingsPanel } from './components/FindingsPanel'
 import { FixDrawer } from './components/FixDrawer'
+import { LabelView } from './components/LabelView'
 import { Stage } from './components/Stage'
 import { StateRail } from './components/StateRail'
 import { TopBar } from './components/TopBar'
@@ -16,6 +17,7 @@ function useKeyboard() {
       const t = e.target as HTMLElement
       if (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || e.metaKey || e.ctrlKey || e.altKey) return
       const s = useStore.getState()
+      if (s.view !== 'scan') return
       if (e.key === 'j' || e.key === 'k') {
         const list = sortedFindings(s.findings, s.tab)
         if (!list.length) return
@@ -60,7 +62,7 @@ export default function App() {
           REPLAY MODE — model responses come from the cache; nothing is being called or spent.
         </div>
       )}
-      {view === 'bench' ? <BenchmarkView /> : (
+      {view === 'bench' ? <BenchmarkView /> : view === 'label' ? <LabelView /> : (
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1">
             <StateRail />

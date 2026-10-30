@@ -82,15 +82,25 @@ def is_visual_container(p: Element) -> bool:
 
 
 def viewport_protrusion(cap: Capture, tile: Tile):
-    if cap.doc_w <= cap.vw + 1:
+    scrolls = cap.doc_w > cap.vw + 1
+    if not scrolls and not cap.root_clip:
         return []
     by_id = {e.id: e for e in tile.elements}
     scrollers = {e.id for e in tile.elements if e.style["overflowX"] in ("auto", "scroll")}
+
     def right(e: Element) -> float:                      # text spilling out of a narrow box counts, not only the box
         return max(e.rect[2], e.text_rect[2]) if e.text_rect else e.rect[2]
 
-    over = [e for e in tile.elements if right(e) > cap.vw + 1
-            and not any(a in scrollers for a in ancestors(e, by_id))]   # inside a scroller is fine
+    if scrolls:
+        over = [e for e in tile.elements if right(e) > cap.vw + 1
+                and not any(a in scrollers for a in ancestors(e, by_id))]   # inside a scroller is fine
+    else:
+        # The page cannot scroll sideways because the root clips overflow, so overflow is simply cut off. Decorative blobs
+        # hang off the edge on purpose, so only text and controls that *start* on screen and run off it count, and
+        # nothing inside a container that clips or scrolls (carousels) or that sits entirely off screen (a closed drawer).
+        scrollers |= {e.id for e in tile.elements if e.tag != "body" and e.style["overflowX"] in ("hidden", "clip")}
+        over = [e for e in tile.elements if (e.text_rect or e.interactive) and e.rect[0] < cap.vw - 1 and right(e) > cap.vw + 1
+                and not any(a in scrollers for a in ancestors(e, by_id))]
     parents_of_over = {e.parent for e in over}
     over_ids = {e.id for e in over}
     # report the deepest culprits: protruding elements with no protruding child ...
@@ -102,7 +112,8 @@ def viewport_protrusion(cap: Capture, tile: Tile):
     for pid, group in by_parent.items():
         # ... but when several siblings protrude because their parent does, the parent is the one thing to fix
         culprits += [by_id[pid]] if len(group) >= 2 and pid in over_ids else group
-    return [cand("viewport_protrusion", tile, [e.id], overflow_px=right(e) - cap.vw) for e in culprits]
+    extra = {} if scrolls else {"clipped_by_root": 1.0}
+    return [cand("viewport_protrusion", tile, [e.id], overflow_px=right(e) - cap.vw, **extra) for e in culprits]
 
 
 def collisions(tile: Tile, min_px: float = 24, cell: int = 64):

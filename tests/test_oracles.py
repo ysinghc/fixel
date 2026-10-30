@@ -20,6 +20,21 @@ def test_viewport_protrusion_ignores_overflow_inside_scroller(found):
     assert not types(c, "viewport_protrusion")
 
 
+def test_viewport_protrusion_fires_when_the_root_clips_sideways_overflow(found):
+    # a fixed bar wider than the screen never makes the page scroll, so the old gate missed it; the cut-off text is a defect
+    c = found(RESET + '<style>body{overflow-x:hidden}</style><nav style="position:fixed;left:0;top:0;width:600px;height:40px;background:#ccc"><a href="#" style="margin-left:330px">Home link</a></nav>', width=375)
+    hits = types(c, "viewport_protrusion")
+    assert hits and hits[0].metrics["clipped_by_root"] == 1.0
+
+
+def test_root_clipped_page_ignores_decorative_blobs_and_clipping_carousels_and_closed_drawers(found):
+    html = RESET + ('<style>body{overflow-x:hidden}</style>'
+                    '<div style="position:absolute;left:300px;top:0;width:200px;height:200px;background:#eee"></div>'      # no text: decorative
+                    '<div style="overflow:hidden;width:300px"><div style="width:900px;height:40px"><p>slide</p></div></div>'  # carousel
+                    '<aside style="position:absolute;left:400px;top:80px;width:200px"><a href="#">Menu item</a></aside>')    # off screen
+    assert not types(found(html, width=375), "viewport_protrusion")
+
+
 # --- clipped text --------------------------------------------------------------------------
 def test_clipped_text_fires_on_hidden_overflow(found):
     c = found(RESET + '<div style="width:80px;height:20px;overflow:hidden;white-space:nowrap">A very long unbroken label here</div>')

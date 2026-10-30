@@ -172,7 +172,7 @@ export interface Layers { dom: boolean; sam: boolean; candidates: boolean; findi
 export type ChipHover = 'geometry' | 'pixels' | 'spark' | null
 
 interface Ui {
-  view: 'scan' | 'bench'
+  view: 'scan' | 'label' | 'bench'
   runId: string | null
   stateKey: string | null
   tile: number
