@@ -1,0 +1,673 @@
+{
+ "run": "20261030-194755-dev-s7",
+ "meta": {
+  "run": "20261030-194755-dev-s7",
+  "split": "dev",
+  "seed": 7,
+  "levels": [
+   "geometry",
+   "diff",
+   "sam",
+   "spark"
+  ],
+  "mode": "record",
+  "targets": [
+   "iiitu-acm",
+   "pastebin"
+  ],
+  "n_states_in_pool": 224,
+  "n_cases": 114,
+  "requested": {
+   "mutated": 90,
+   "clean": 30
+  },
+  "skipped_no_target": 254,
+  "skipped_unstable": 0,
+  "unfinished": 6,
+  "usd": 3.6772,
+  "model_calls": {
+   "live": 876,
+   "cached": 1617
+  },
+  "seconds": 612.3,
+  "code": {
+   "commit": "fb8b12b",
+   "dirty": false
+  },
+  "ops": [
+   "nowrap_long",
+   "fixed_width",
+   "clamp_height",
+   "negative_margin",
+   "nudge",
+   "font_bump",
+   "no_wrap_row",
+   "img_unbounded",
+   "low_contrast",
+   "tiny_target",
+   "opaque_banner",
+   "ghost_banner",
+   "badge_overlap",
+   "open_dropdown",
+   "invisible_overlap"
+  ],
+  "created": 1793390287.7271073,
+  "widths": null,
+  "note": "Every case with kind 'mutated' has an injected defect or control; 'clean' cases are unmodified pages."
+ },
+ "levels": [
+  "geometry",
+  "diff",
+  "sam",
+  "spark"
+ ],
+ "n_cases": 114,
+ "n_mutated": 84,
+ "n_clean": 30,
+ "construction": {
+  "geometry": {
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "badge_overlap": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "open_dropdown": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "invisible_overlap": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "controls": {
+    "k": 10,
+    "n": 18,
+    "p": 0.5556,
+    "lo": 0.3372,
+    "hi": 0.7544
+   }
+  },
+  "diff": {
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "badge_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "open_dropdown": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "invisible_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "controls": {
+    "k": 18,
+    "n": 18,
+    "p": 1.0,
+    "lo": 0.8241,
+    "hi": 1.0
+   }
+  },
+  "sam": {
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "badge_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "open_dropdown": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "invisible_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "controls": {
+    "k": 17,
+    "n": 18,
+    "p": 0.9444,
+    "lo": 0.7424,
+    "hi": 0.9901
+   }
+  },
+  "spark": {
+   "opaque_banner": {
+    "k": 1,
+    "n": 6,
+    "p": 0.1667,
+    "lo": 0.0301,
+    "hi": 0.5635
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "badge_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "open_dropdown": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "invisible_overlap": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "controls": {
+    "k": 18,
+    "n": 18,
+    "p": 1.0,
+    "lo": 0.8241,
+    "hi": 1.0
+   }
+  }
+ },
+ "injected_agreement": {
+  "geometry": {
+   "clamp_height": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "fixed_width": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "font_bump": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "img_unbounded": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "low_contrast": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "negative_margin": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "nowrap_long": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "nudge": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "tiny_target": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "_all": {
+    "k": 48,
+    "n": 66,
+    "p": 0.7273,
+    "lo": 0.6096,
+    "hi": 0.82
+   },
+   "_involves_target": {
+    "k": 42,
+    "n": 66,
+    "p": 0.6364,
+    "lo": 0.5158,
+    "hi": 0.7419
+   }
+  },
+  "diff": {
+   "clamp_height": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "fixed_width": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "font_bump": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "img_unbounded": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "low_contrast": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "negative_margin": {
+    "k": 3,
+    "n": 6,
+    "p": 0.5,
+    "lo": 0.1876,
+    "hi": 0.8124
+   },
+   "nowrap_long": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "nudge": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "tiny_target": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "_all": {
+    "k": 46,
+    "n": 66,
+    "p": 0.697,
+    "lo": 0.5778,
+    "hi": 0.7945
+   },
+   "_involves_target": {
+    "k": 40,
+    "n": 66,
+    "p": 0.6061,
+    "lo": 0.4855,
+    "hi": 0.715
+   }
+  },
+  "sam": {
+   "clamp_height": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "fixed_width": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "font_bump": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "img_unbounded": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "low_contrast": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "negative_margin": {
+    "k": 3,
+    "n": 6,
+    "p": 0.5,
+    "lo": 0.1876,
+    "hi": 0.8124
+   },
+   "nowrap_long": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "nudge": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "opaque_banner": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "tiny_target": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "_all": {
+    "k": 46,
+    "n": 66,
+    "p": 0.697,
+    "lo": 0.5778,
+    "hi": 0.7945
+   },
+   "_involves_target": {
+    "k": 40,
+    "n": 66,
+    "p": 0.6061,
+    "lo": 0.4855,
+    "hi": 0.715
+   }
+  },
+  "spark": {
+   "clamp_height": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "fixed_width": {
+    "k": 3,
+    "n": 6,
+    "p": 0.5,
+    "lo": 0.1876,
+    "hi": 0.8124
+   },
+   "font_bump": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "ghost_banner": {
+    "k": 0,
+    "n": 6,
+    "p": 0.0,
+    "lo": 0.0,
+    "hi": 0.3903
+   },
+   "img_unbounded": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "low_contrast": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "negative_margin": {
+    "k": 3,
+    "n": 6,
+    "p": 0.5,
+    "lo": 0.1876,
+    "hi": 0.8124
+   },
+   "nowrap_long": {
+    "k": 5,
+    "n": 6,
+    "p": 0.8333,
+    "lo": 0.4365,
+    "hi": 0.9699
+   },
+   "nudge": {
+    "k": 6,
+    "n": 6,
+    "p": 1.0,
+    "lo": 0.6097,
+    "hi": 1.0
+   },
+   "opaque_banner": {
+    "k": 1,
+    "n": 6,
+    "p": 0.1667,
+    "lo": 0.0301,
+    "hi": 0.5635
+   },
+   "tiny_target": {
+    "k": 4,
+    "n": 6,
+    "p": 0.6667,
+    "lo": 0.3,
+    "hi": 0.9032
+   },
+   "_all": {
+    "k": 37,
+    "n": 66,
+    "p": 0.5606,
+    "lo": 0.4408,
+    "hi": 0.6737
+   },
+   "_involves_target": {
+    "k": 34,
+    "n": 66,
+    "p": 0.5152,
+    "lo": 0.3971,
+    "hi": 0.6315
+   }
+  }
+ },
+ "localization": {
+  "geometry": {
+   "k": 41,
+   "n": 48,
+   "p": 0.8542,
+   "lo": 0.7283,
+   "hi": 0.9275
+  },
+  "diff": {
+   "k": 39,
+   "n": 46,
+   "p": 0.8478,
+   "lo": 0.7178,
+   "hi": 0.9243
+  },
+  "sam": {
+   "k": 39,
+   "n": 46,
+   "p": 0.8478,
+   "lo": 0.7178,
+   "hi": 0.9243
+  },
+  "spark": {
+   "k": 32,
+   "n": 37,
+   "p": 0.8649,
+   "lo": 0.7202,
+   "hi": 0.9409
+  }
+ },
+ "labels": {
+  "n": 0,
+  "visible_defect": 0,
+  "no_visible_defect": 0,
+  "unsure": 0
+ },
+ "human": null,
+ "headline": false,
+ "caveats": [
+  "All non-clean cases carry an injected defect or control (kind 'mutated'); they are not real bugs found in the wild.",
+  "Split 'dev' is the development split: numbers here tune thresholds and are not results.",
+  "No human labels yet: the only truth available is by construction and agreement with the injection, which is not detection accuracy.",
+  "6 requested cases could not be placed (an operator found no target); 254 placement attempts were skipped."
+ ],
+ "cost": {
+  "usd": 3.6772,
+  "model_calls": {
+   "live": 876,
+   "cached": 1617
+  },
+  "seconds": 612.3,
+  "usd_per_case": 0.0323,
+  "seconds_per_case": 5.37
+ }
+}

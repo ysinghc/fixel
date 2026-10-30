@@ -1,0 +1,55 @@
+{
+ "run": "20261030-194755-dev-s7",
+ "split": "dev",
+ "seed": 7,
+ "levels": [
+  "geometry",
+  "diff",
+  "sam",
+  "spark"
+ ],
+ "mode": "record",
+ "targets": [
+  "iiitu-acm",
+  "pastebin"
+ ],
+ "n_states_in_pool": 224,
+ "n_cases": 114,
+ "requested": {
+  "mutated": 90,
+  "clean": 30
+ },
+ "skipped_no_target": 254,
+ "skipped_unstable": 0,
+ "unfinished": 6,
+ "usd": 3.6772,
+ "model_calls": {
+  "live": 876,
+  "cached": 1617
+ },
+ "seconds": 612.3,
+ "code": {
+  "commit": "fb8b12b",
+  "dirty": false
+ },
+ "ops": [
+  "nowrap_long",
+  "fixed_width",
+  "clamp_height",
+  "negative_margin",
+  "nudge",
+  "font_bump",
+  "no_wrap_row",
+  "img_unbounded",
+  "low_contrast",
+  "tiny_target",
+  "opaque_banner",
+  "ghost_banner",
+  "badge_overlap",
+  "open_dropdown",
+  "invisible_overlap"
+ ],
+ "created": 1793390287.7271073,
+ "widths": null,
+ "note": "Every case with kind 'mutated' has an injected defect or control; 'clean' cases are unmodified pages."
+}

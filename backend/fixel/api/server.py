@@ -59,7 +59,7 @@ class LabelRequest(BaseModel):
 
 def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_root: Path | str | None = None,
                config_roots: list[Path] | None = None, llm_factory=None, budget_usd: float = DEFAULT_BUDGET_USD,
-               web_dist: Path | str | None = None) -> FastAPI:
+               web_dist: Path | str | None = None, bench_root: Path | str | None = None) -> FastAPI:
     root = Path(root).resolve()
     mgr = RunManager(DB(db_path or root / ".fixel" / "fixel.db"), ArtifactStore(store_root or root / ".fixel" / "artifacts"),
                      root, config_roots, llm_factory, budget_usd)
@@ -204,7 +204,7 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
         raise HTTPException(501, "voice intake is not built yet")
 
     # ------------------------------------------------------------------ the benchmark (measured results only; see bench/metrics.py)
-    bench_root = root / ".fixel" / "bench"
+    bench_root = Path(bench_root) if bench_root else root / ".fixel" / "bench"
 
     def bench_run(run: str) -> Path:
         d = (bench_root / run).resolve()

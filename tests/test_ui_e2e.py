@@ -53,7 +53,7 @@ def server(tmp_path):
         f"target:\n  name: demo-shop\n  split: demo\n  path: {DEMO}\nroutes: [/]\n"
         "matrix:\n  widths: [320, 375, 1024]\n  themes: [light, dark]\n  text_stress: [none]\n  height: 600\n")
     scripts = iter([FIX_CARD, FIX_PERKS])
-    app = create_app(REPO, db_path=tmp_path / "fixel.db", store_root=tmp_path / "art", config_roots=[cfgs],
+    app = create_app(REPO, db_path=tmp_path / "fixel.db", store_root=tmp_path / "art", config_roots=[cfgs], bench_root=tmp_path / "no-bench",
                      llm_factory=lambda model, fallback, emit: Scripted(next(scripts), model))
     with Live(app) as live:
         yield live

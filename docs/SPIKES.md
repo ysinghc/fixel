@@ -77,3 +77,23 @@ A first run of the card fix passed only on its second `finish`: the verifier rep
 cookie-banner defect under a different key (its coverer was keyed by whichever inner element a hit-test sample landed on, and a
 duplicate `collision` report became observable once the page reflowed). The model then edited unrelated code to silence it.
 Fixed in the oracles (stable coverer key, no duplicate collision); the rerun passed first time.
+
+## Benchmark: first development-split run (not a result)
+
+Run `20261030-194755-dev-s7`, exported to `docs/bench/20261030-194755-dev-s7/`. Development split (`iiitu-acm`, `pastebin`), seed 7,
+84 injected cases + 30 unmodified, all four levels, `record` mode, commit `fb8b12b`. $3.68 for 114 cases (about $0.03 each; 876 live
+and 1,617 cached model calls; 612 s). **No human labels exist for it**, so none of this is detection accuracy; it is what the
+construction-based checks and the agreement-with-injection signal showed. 6 of the 90 requested cases could not be placed (an operator found no element to break).
+
+- **Controls** (known answers): geometry alone passes 10/18 (it cannot dismiss anything), + opacity diff 18/18, + SAM 17/18, + Spark 18/18.
+  The invisible-text control found a real bug: a collision between visible and invisible text was "observable" (fixed, regression fixture).
+- **Opaque banner over a button** is confirmed 6/6 by geometry, diff and SAM, and **dismissed as intentional by Spark in 5 of 6**. A cookie
+  banner covering a button looks like a banner. Whether that is right is a human-label question: if people call these defects, Spark's
+  dismissal is a false negative the benchmark will show. Spark also removed 2 of 6 `tiny_target`, 1 of 6 `low_contrast` and 1 of 6 `fixed_width` hits.
+  Agreement with the injection falls from 70% (SAM) to 56% (Spark) overall; that is a reason to look at the labels, not to tune Spark's threshold on this.
+- **Opacity diff** dropped `negative_margin` from 5/6 to 3/6 (the overlap was judged not painted in the diff).
+- **Known gaps** (also in `docs/BENCHMARK.md`): `ghost_banner` 0/6 and `font_bump` 0/6 at every level.
+- Cost control that mattered: re-triaging findings that were already in the unmutated state cost about 3x as much (first attempt: $1.50 for 10 cases);
+  verdicts for unchanged finding keys are now reused.
+
+Next for the benchmark: freeze detection, run the **test split** once, label it blind in the UI, then report only that.
