@@ -2,5 +2,6 @@
 # only referenced as a submodule pointer; none of its code is copied into this repo.
 target:
   name: aavesh
+  split: test
   path: targets/aavesh/client
 routes: [/]

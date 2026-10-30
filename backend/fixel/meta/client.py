@@ -59,11 +59,13 @@ async def call(kind: str, payload: dict, fn, emit=None) -> dict:
     elif m == "replay":
         raise CacheMiss(path.name)                       # replay never spends credits
     else:
+        if emit:                                         # lets the UI pulse a model pill while the call is in flight
+            await emit({"type": "model.start", "kind": kind, "model": payload.get("model")})
         out, src = await retry(fn), "live"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(out))
     if emit:
-        await emit({"type": "model.call", "kind": kind, "source": src, "usage": out.get("usage")})
+        await emit({"type": "model.call", "kind": kind, "model": payload.get("model"), "source": src, "usage": out.get("usage")})
     return out
 
 

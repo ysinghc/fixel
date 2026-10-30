@@ -24,7 +24,8 @@ async def test_record_mode_stores_then_serves_from_cache(monkeypatch):
     a = await client.call("spark.triage", {"img": "abc"}, fn, emit)
     b = await client.call("spark.triage", {"img": "abc"}, fn, emit)
     assert a == b and len(calls) == 1
-    assert [e["source"] for e in events] == ["live", "cached"]
+    assert [e["source"] for e in events if e["type"] == "model.call"] == ["live", "cached"]
+    assert events[0]["type"] == "model.start"                          # the UI pulses a pill during the call
 
 
 async def test_replay_never_calls_and_raises_on_miss(monkeypatch):

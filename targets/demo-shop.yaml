@@ -2,6 +2,7 @@
 # Defects: PriceCard has a fixed 480px width, Perks is a non-wrapping chip row, CookieBanner covers the Checkout button.
 target:
   name: demo-shop
+  split: demo
   path: targets/demo-shop
 routes: [/]
 matrix:

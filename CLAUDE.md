@@ -31,15 +31,16 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 - `fixel scan --static tests/fixtures/site --route /index.html --widths 320 1440`: geometry-only scan of the planted-bug fixture site. Without `--static`, it scans the running app at `target.base_url`.
 - `make targets`: init the target submodules and `npm install` each app. Then `fixel scan --config targets/iiitu-acm.yaml` starts that app's dev server itself (with the data-loc plugin), scans it, and stops it.
 - `fixel fix --config targets/demo-shop.yaml --list`: scan the target in an isolated worktree and list the confirmed findings; then `--index N` or `--finding <text in key>` runs the fix agent on one (live model calls). Exports a `.patch` only if the model-free verifier passes.
+- `make web`: build the React UI into `web/dist`. `make serve` (or `fixel serve [--budget USD]`) runs the API and serves the UI at `http://127.0.0.1:8765`; `make web-dev` is the hot-reload dev server proxying `/api`.
 - `make demo-smoke`: run the demo path from cache (`FIXEL_MODE=replay`); the test it runs is not written yet.
 
 ## Status
 
 The scan-to-verified-fix loop works end to end. `fixel scan` detects (geometry oracles, opacity diff, SAM 3.1, Spark triage, fusion) and `fixel fix` repairs: an isolated git worktree, a Wonder tool-calling agent whose edits pass the symptom-hiding linter, and a model-free verifier over the whole width x theme matrix. Verified live on all three planted defects of `targets/demo-shop` (see `docs/SPIKES.md`).
 
-Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: data-loc via the webpack loader); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
+Built: `api/{db,runs,server}.py`, `cost.py`, `web/` (React UI), `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: data-loc via the webpack loader); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
 
-Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `bench/` (mutations, corpus, metrics, ablations), `explore/cua.py`, `meta/{voice,image,spark}.py`. Next in the build plan (guide section 13): API and event stream, then the UI, then the benchmark and human labelling.
+Still stubs: `bench/` (mutations, corpus, metrics, ablations; the UI's Benchmark tab says so), `explore/cua.py`, `meta/{voice,image,spark}.py`, mask decoding for SAM. Next in the build plan (guide section 13): the benchmark and human labelling, then the replay demo smoke test.
 
 ## Deviations from the guide
 
@@ -69,6 +70,10 @@ Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `benc
 - **Oracle gaps found by tests:** text spilling out of a narrow box now counts as viewport protrusion; protruding siblings are reported once as their protruding parent.
 
 - **data-loc for Next.js** (`tooling/next-data-loc.cjs` + `next-data-loc-loader.cjs`, set up by `target.py:build_env` through `NODE_OPTIONS`): Next has no `--config` flag, so a Node preload wraps `loadConfig` from `next/dist/server/config` and adds a pre-loader rule to the config's `webpack()` hook. Hooking the *result* of `loadConfig` is deliberate: Next loads the user's config with a native `import()`, and Node's ESM bridge ignores anything a patched `Module._load` returns for it, so wrapping the user's module does not work. The loader falls back to the original source (with a webpack warning) on a parse error, so it cannot break a target's build.
+
+- **API and event stream (`api/`).** Every run (scan or fix) is a stream of typed events persisted in SQLite (`runs/events/captures/findings/fixes/labels`) with a per-run `seq` *before* it is fanned out. `GET /api/runs/{id}/events?after=N` (SSE, also honours `Last-Event-ID`) subscribes before reading history, so a reconnect has no gaps or repeats. Scans emit `state.done` after a state's capture is saved; the UI fetches state detail only then. Config paths are limited to `fixel.yaml`, `targets/*` and configured roots. One fix runs at a time (`fix_lock`). Finding keys contain `#`, so clients must percent-encode them. Spend is counted from live calls only; at the budget (default $10) the run stops with `budget` and says so.
+- **The UI is a pure function of the event log** (`web/src/store.ts:reduce`), so reload, "Open run..." and replay rebuild the same screen. It shows what the backend knows and nothing more: the Benchmark tab states it is not built, Voice is greyed, a fix is "verified" and exportable only when the model-free verifier passed it (`GET /api/fixes/{id}/patch` returns 409 otherwise), and a test-split target carries a chip. `tests/test_ui_e2e.py` drives the built UI in Chromium against the real API, a real target and a scripted fix model: linter-bounced edit, verified fix, a bad fix refused, reload rebuild.
+- **`fix.tool.result` is emitted for `finish` too** (ok = the verifier passed), so the timeline row does not stay "running".
 
 ## Build order and cut order
 

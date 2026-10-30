@@ -202,3 +202,17 @@ async def test_fallback_failure_is_raised(cache, monkeypatch):
     monkeypatch.setattr(client, "get_client", lambda: fake_client([], fail_models={"muse-wonder-1.0", "muse-spark-1.3"}))
     with pytest.raises(APIStatusError):
         await FixLLM().turn([{"role": "user", "content": []}])
+
+
+def test_tool_results_are_summarized_for_the_timeline():
+    from fixel.fix.tools import summarize_result as sr
+    assert sr("edit_file", {"applied": True, "diff": "x"}) == {"ok": True, "detail": "applied"}
+    blocked = sr("edit_file", {"rejected": ["clipping hides the symptom: overflow:hidden"], "note": "reverted"})
+    assert blocked["blocked"] and not blocked["ok"] and "clipping" in blocked["detail"]
+    assert not sr("edit_file", {"error": "old text not found"})["ok"]
+    ok = sr("rerender", {"states": {"a": "defect gone", "b": "defect gone"}, "defect_gone_in_all_checked_states": True, "new_defects": []})
+    assert ok == {"ok": True, "detail": "defect gone in 2/2 states"}
+    bad = sr("rerender", {"states": {"a": "defect gone", "b": "defect still present"}, "defect_gone_in_all_checked_states": False, "new_defects": ["x"]})
+    assert not bad["ok"] and "1/2" in bad["detail"] and "1 new defect" in bad["detail"]
+    assert sr("search", ["a:1: x", "b:2: y"])["detail"] == "2 matches" and sr("search", "no matches")["detail"] == "no matches"
+    assert sr("read_file", "1: a\n2: b")["detail"] == "2 lines"

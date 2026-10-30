@@ -2,5 +2,6 @@
 # explorer. No LICENSE file (author's own code).
 target:
   name: pastebin
+  split: development
   path: targets/pastebin/frontend
 routes: [/]

@@ -224,3 +224,29 @@ async def dispatch(name: str, args: dict, ctx: FixContext, emit=None) -> tuple[o
     except (KeyError, ValueError, TypeError) as e:
         return {"error": f"bad arguments for {name}: {e}"}, []
     return {"error": f"unknown tool {name}"}, []
+
+
+def summarize_result(name: str, result: object) -> dict:
+    """What the timeline shows for a finished tool call: ok/blocked/error and a short phrase."""
+    r = result if isinstance(result, dict) else {}
+    if r.get("error"):
+        return {"ok": False, "detail": str(r["error"])[:160]}
+    if name == "edit_file":
+        if r.get("rejected"):
+            return {"ok": False, "blocked": True, "detail": "; ".join(r["rejected"])[:200]}
+        return {"ok": True, "detail": "applied"}
+    if name == "rerender":
+        st = r.get("states", {})
+        gone = sum(v == "defect gone" for v in st.values())
+        new = r.get("new_defects") or []
+        return {"ok": bool(r.get("defect_gone_in_all_checked_states")) and not new,
+                "detail": f"defect gone in {gone}/{len(st)} states" + (f", {len(new)} new defect(s)" if new else "")}
+    if name == "search":
+        return {"ok": True, "detail": "no matches" if isinstance(result, str) else f"{len(result)} matches"}
+    if name == "check_css_support":
+        return {"ok": True, "detail": f"{len(r.get('sources', []))} sources"}
+    if name == "reset":
+        return {"ok": True, "detail": "back to the original code"}
+    if name == "read_file" and isinstance(result, str):
+        return {"ok": True, "detail": f"{len(result.splitlines())} lines"}
+    return {"ok": True, "detail": ""}

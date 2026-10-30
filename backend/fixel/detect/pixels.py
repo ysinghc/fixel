@@ -125,6 +125,7 @@ async def add_sam(cap: Capture, cands: list[Candidate], evidence: list[PixelEvid
             continue
         m = [iou_and_spill(b, g) for g, b in pairs]
         px = px.model_copy(update={"sam_conf": min(g.conf for g, _ in pairs), "sam_iou": min(i for i, _ in m),
-                                   "sam_spill": max(s for _, s in m)})
+                                   "sam_spill": max(s for _, s in m),
+                                   "sam_boxes": [(g.left, g.top, g.right, g.bottom, g.conf) for g, _ in pairs]})
         out.append(px.model_copy(update={"observable": observable(c, px)}))
     return out

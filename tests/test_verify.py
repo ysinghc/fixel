@@ -108,8 +108,10 @@ async def test_events_are_emitted_for_each_checklist_item(repo, tmp_path):
         f = next(f for f in findings_of(base) if f.type == "viewport_protrusion")
         ws.edit("index.html", PROMO, GOOD)
         await verify(f, ws, base, store, emit=emit)
-    assert [e["item"] for e in events] == ["lint", "target_gone", "no_new_findings", "no_drift", "build"]
-    assert all(e["type"] == "fix.verify" and e["ok"] for e in events)
+    items = [e for e in events if e["type"] == "fix.verify"]
+    assert [e["item"] for e in items] == ["lint", "target_gone", "no_new_findings", "no_drift", "build"] and all(e["ok"] for e in items)
+    cells = [e for e in events if e["type"] == "fix.verify.state"]
+    assert [e["state_key"] for e in cells] == ["/index.html|320|light|none|0"] and cells[0]["ok"]        # one cell per re-rendered state
 
 
 def test_matrix_defaults_cover_the_guides_grid():

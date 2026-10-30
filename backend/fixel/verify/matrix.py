@@ -56,8 +56,13 @@ async def verify(f: Finding, ws: Workspace, baseline: list[Scanned], store: Arti
     notes += [f"lint: {e}" for e in errs]
     await say("lint", lint_ok)
 
-    after = await scan_states(states, ws.url, store, parallel, sam=False)
     target = remap_key(f.key, remap)
+
+    async def state_done(r: Scanned) -> None:
+        if emit:                                          # the proof grid fills cell by cell as states are re-rendered
+            await emit({"type": "fix.verify.state", "state_key": r.cap.state.key, "ok": target not in confirmed_keys([r])})
+
+    after = await scan_states(states, ws.url, store, parallel, sam=False, on_state=state_done)
     now = confirmed_keys(after)
     before = {remap_key(k, remap) for k in confirmed_keys(baseline)}
     grid = {r.cap.state.key: target not in confirmed_keys([r]) for r in after}
@@ -81,5 +86,7 @@ async def verify(f: Finding, ws: Workspace, baseline: list[Scanned], store: Arti
             notes.append("build failed: " + "\n".join(out.strip().splitlines()[-12:]))
     await say("build", build_ok)
 
+    tile_idx = cand_src[1].tile if cand_src else 0           # the tile that shows the target element
+    shots = {r.cap.state.key: r.cap.tiles[min(tile_idx, len(r.cap.tiles) - 1)].png_sha for r in after if r.cap.tiles}
     return Verification(target_gone=target_gone, new_findings=new_findings, drifted=drifted, build_ok=build_ok,
-                        lint_ok=lint_ok, grid=grid, notes=notes)
+                        lint_ok=lint_ok, grid=grid, shots=shots, notes=notes)

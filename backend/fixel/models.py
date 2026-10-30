@@ -56,6 +56,7 @@ class PixelEvidence(BaseModel):
     sam_conf: float | None = None
     sam_iou: float | None = None                  # IoU of the returned bounds with the prompted DOM box
     opacity_diff: float | None = None             # share of overlap pixels that change when B is hidden
+    sam_boxes: list[tuple[int, int, int, int, float]] = []   # SAM's returned bounds (left, top, right, bottom, confidence) for the UI overlay
     observable: bool
 
 class Triage(BaseModel):
@@ -83,6 +84,7 @@ class Verification(BaseModel):
     build_ok: bool
     lint_ok: bool
     grid: dict[str, bool] = {}                    # state key -> the target finding is gone in that state
+    shots: dict[str, str] = {}                    # state key -> screenshot sha after the patch (the tile that shows the target)
     notes: list[str] = []                         # build output tail, lint errors: what to show when something fails
     @property
     def passed(self) -> bool:

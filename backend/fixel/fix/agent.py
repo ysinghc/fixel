@@ -19,7 +19,7 @@ from ..models import FixAttempt, Finding, Verification
 from ..scan import Scanned
 from ..store import ArtifactStore
 from ..verify.matrix import verify
-from .tools import TOOLS, FixContext, build_context, dispatch
+from .tools import TOOLS, FixContext, build_context, dispatch, summarize_result
 from .worktree import Workspace
 
 FIX_SYSTEM = """You repair one visual layout defect in a web app. You work on a copy of the code and see the page only
@@ -140,16 +140,21 @@ async def fix_finding(f: Finding, ws: Workspace, baseline: list[Scanned], store:
                 if not diff:
                     results.append({"type": "function_call_output", "call_id": c["call_id"],
                                     "output": json.dumps({"verified": False, "details": ["no edits were made"]})})
+                    await say({"type": "fix.tool.result", "name": "finish", "ok": False, "detail": "no edits were made"})
                     finished = True
                     continue
+                await say({"type": "fix.verifying", "round": verifications + 1})
                 v = await verify(f, ws, baseline, store, emit=emit)
                 verifications += 1
                 attempts.append(FixAttempt(finding_key=f.key, model=llm.model, diff=diff, lint_errors=list(ctx.lint_errors),
                                            verification=v, citations=list(ctx.citations)))
                 results.append({"type": "function_call_output", "call_id": c["call_id"], "output": json.dumps(checklist(v))})
+                await say({"type": "fix.tool.result", "name": "finish", "ok": v.passed,
+                           "detail": "verified" if v.passed else "; ".join(v.notes)[:160] or "not verified"})
                 finished = v.passed or verifications >= max_verifications
                 continue
             result, imgs = await dispatch(c["name"], args, ctx, emit)
+            await say({"type": "fix.tool.result", "name": c["name"], **summarize_result(c["name"], result)})
             results.append({"type": "function_call_output", "call_id": c["call_id"],
                             "output": result if isinstance(result, str) else json.dumps(result)})
             if imgs:

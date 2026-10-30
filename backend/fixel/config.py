@@ -9,6 +9,7 @@ from .models import StateSpec
 
 class Target(BaseModel):
     name: str = "app"
+    split: str | None = None                      # development | test | demo: which benchmark split this app belongs to
     path: str | None = None
     dev_cmd: str | None = None
     build_cmd: str | None = "npm run build"       # run in the fix worktree by the verifier; None skips the build check

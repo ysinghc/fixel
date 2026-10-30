@@ -1,9 +1,20 @@
-.PHONY: install targets test demo-smoke
+.PHONY: install targets test web web-dev serve demo-smoke
 
 install:
 	pip install -e ".[dev]"
 	npm ci
 	playwright install chromium
+
+# Build the React UI into web/dist, which `fixel serve` then serves next to the API.
+web:
+	cd web && npm ci && npm run build
+
+# UI dev server with hot reload; proxies /api to `fixel serve` on 127.0.0.1:8765.
+web-dev:
+	cd web && npm run dev
+
+serve: web
+	fixel serve
 
 targets:
 	git submodule update --init --depth 1

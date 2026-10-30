@@ -173,6 +173,21 @@ def cmd_fix(args) -> int:
     return asyncio.run(run_fix(conf, args))
 
 
+def cmd_serve(args) -> int:
+    import uvicorn
+    from .api.server import create_app
+    load_dotenv()
+    app = create_app(".", budget_usd=args.budget)
+    print(f"fixel API and UI on http://{args.host}:{args.port}  (mode {meta_mode()}, models {'on' if models_available() else 'off'})")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
+def meta_mode() -> str:
+    from .meta import client
+    return client.mode()
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="fixel")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -200,6 +215,11 @@ def main(argv: list[str] | None = None) -> int:
     fx.add_argument("--offline", action="store_true", help="skip the Spark description (the fix model still needs the API)")
     fx.add_argument("--out")
     fx.set_defaults(fn=cmd_fix)
+    sv = sub.add_parser("serve", help="run the API and the demo UI")
+    sv.add_argument("--host", default="127.0.0.1")
+    sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--budget", type=float, default=10.0, help="stop starting model calls for a run once it has cost this many dollars")
+    sv.set_defaults(fn=cmd_serve)
     args = ap.parse_args(argv)
     load_dotenv()                                   # MODEL_API_KEY etc. from .env; real environment variables win
     return args.fn(args)

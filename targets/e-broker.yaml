@@ -6,6 +6,7 @@
 # let NextAuth start and the API URLs point at nothing.
 target:
   name: e-broker
+  split: test
   path: targets/e-broker
   build_cmd: "npm run build"
   env:
