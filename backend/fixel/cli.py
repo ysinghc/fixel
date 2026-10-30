@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from . import config as cfg
+from .env import load_dotenv
 from .capture.browser import Browsers, capture, new_context
 from .detect.fuse import candidate_key, fuse
 from .detect.oracles import run_oracles
@@ -190,6 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--out")
     sc.set_defaults(fn=cmd_scan)
     args = ap.parse_args(argv)
+    load_dotenv()                                   # MODEL_API_KEY etc. from .env; real environment variables win
     return args.fn(args)
 
 

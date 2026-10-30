@@ -2,14 +2,14 @@
 
 install:
 	pip install -e ".[dev]"
-	npm install
+	npm ci
 	playwright install chromium
 
 targets:
 	git submodule update --init --depth 1
-	cd targets/iiitu-acm/client && npm install
-	cd targets/pastebin/frontend && npm install
-	cd targets/aavesh/client && npm install
+	cd targets/iiitu-acm/client && npm ci
+	cd targets/pastebin/frontend && npm ci
+	cd targets/aavesh/client && npm ci
 
 test:
 	pytest
