@@ -2,7 +2,7 @@
 
 Fixel finds visual layout bugs in a web app across a matrix of viewports, themes and text lengths, proves each one with pixels, traces it to the source line, and proposes a minimal CSS or className patch. A patch counts as fixed only after a deterministic, model-free verifier re-renders the whole matrix and finds the bug gone, nothing new broken, and nothing else moved.
 
-> "Fixel" is a working title. **Status: detection works end to end.** `fixel scan` finds, confirms (geometry + opacity diff + SAM 3.1) and triages (Spark 1.3) layout defects on real apps and points at the source line. Fixing and verification are still stubs. See `docs/SPIKES.md` for results and `CLAUDE.md` for status.
+> "Fixel" is a working title. **Status: detection works end to end.** `fixel scan` finds, confirms (geometry + opacity diff + SAM 3.1) and triages (Spark 1.3) layout defects on real apps and points at the source line. `fixel fix` repairs a finding in an isolated worktree and exports a patch only when a model-free verifier passes it. See `docs/SPIKES.md` for results and `CLAUDE.md` for status.
 
 ## Docs
 

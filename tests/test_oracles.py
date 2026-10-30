@@ -123,7 +123,7 @@ def test_sticky_nav_over_scrolled_content_is_transient(snap):
     # the link lands at y=15 in the third 600px tile, under the nav's text
     html = RESET + STICKY_NAV + '<div style="height:1159px"></div><a href="#" style="display:block">Footer link text</a><div style="height:900px"></div>'
     cap = snap(html, width=375, height=600)
-    hits = [c for c in run_oracles(cap) if c.type == "collision"]
+    hits = [c for c in run_oracles(cap) if c.type in ("collision", "occlusion")]        # the nav covers the link: one defect
     assert hits and all(c.metrics.get("transient") for c in hits) and cap.doc_h > 2000
 
 
@@ -171,3 +171,30 @@ def test_a_single_protruding_child_is_still_the_culprit(snap):
     html = RESET + '<div style="width:300px"><p style="white-space:nowrap">A long unbroken line of text that cannot wrap and runs past the edge</p></div>'
     hits = [c for c in run_oracles(snap(html, width=375)) if c.type == "viewport_protrusion"]
     assert len(hits) == 1
+
+
+# --- one defect, one key -------------------------------------------------------------------
+BANNER_WITH_TEXT = ('<div style="height:480px"></div><button style="width:140px;height:44px">Checkout</button>'
+                    '<div style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#333;color:#fff;padding:8px;z-index:50">'
+                    '<p style="margin:0">We use cookies</p></div>')
+
+
+def test_the_coverer_is_named_by_its_fixed_root_not_by_the_inner_element_that_was_hit(snap):
+    cap = snap(RESET + BANNER_WITH_TEXT, width=375, height=560)
+    tile = cap.tiles[0]
+    by_id = {e.id: e for e in tile.elements}
+    (occ,) = [c for c in run_oracles(cap) if c.type == "occlusion" and c.tile == 0]
+    assert [by_id[i].tag for i in occ.elements] == ["button", "div"]            # the banner box, not its <p>
+    assert by_id[occ.elements[1]].style["position"] == "fixed"
+
+
+def test_a_collision_already_explained_by_an_occlusion_is_not_reported_twice(snap):
+    cands = run_oracles(snap(RESET + BANNER_WITH_TEXT, width=375, height=560))
+    assert [c for c in cands if c.type == "occlusion"]
+    assert not [c for c in cands if c.type == "collision"]                      # button text vs banner text: same defect
+
+
+def test_unrelated_collisions_survive_next_to_an_occlusion(snap):
+    html = RESET + '<p style="margin:0">Overlapping line one</p><p style="margin:-14px 0 0">Overlapping line two</p>' + BANNER_WITH_TEXT
+    cands = run_oracles(snap(html, width=375, height=560))
+    assert [c for c in cands if c.type == "collision"]                          # the two paragraphs still collide

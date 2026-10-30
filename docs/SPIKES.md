@@ -59,3 +59,21 @@ covers those. These are development-split observations, not benchmark numbers.
 Triage is about $0.004 per call (the guide assumed about $0.0083), so 3,000 triages are about $12 rather than $23. A Wonder
 session was 18.6 K tokens (about $0.10) against the guide's 80 K input assumption. SAM is $0.0025 per request. The $150
 credit has far more headroom than the plan assumed.
+
+## Fix loop results (2026-10-30)
+
+`fixel fix` on `targets/demo-shop` (React 19, Vite 8, Tailwind 4, three planted defects), Muse Wonder, verification over
+6 widths. All three verified on the first `finish` with no new findings, no drift, build passing and the linter clean.
+
+| Defect | Patch | Turns | Tokens |
+|---|---|---|---|
+| `PriceCard` fixed 480 px width | `max-w-full` on the card | 3 | 3,253 |
+| `Perks` non-wrapping chip row | `flex-nowrap` -> `flex-wrap` | 3 | 8,513 |
+| `CookieBanner` covers the Checkout button | `pb-32` on `<main>` in `App.jsx` (the banner is `h-32`) | 5 | 24,377 |
+
+Roughly $0.02-0.15 per fix at Wonder's prices. The planted-bug static page took 4 turns and 11,954 tokens, 35 s end to end.
+
+A first run of the card fix passed only on its second `finish`: the verifier reported a "new finding" that was the pre-existing
+cookie-banner defect under a different key (its coverer was keyed by whichever inner element a hit-test sample landed on, and a
+duplicate `collision` report became observable once the page reflowed). The model then edited unrelated code to silence it.
+Fixed in the oracles (stable coverer key, no duplicate collision); the rerun passed first time.

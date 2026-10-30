@@ -168,8 +168,44 @@ def element_protrusion(tile: Tile, tol: float = 2):
 
 
 def occlusions(tile: Tile, min_cover: float = 0.4):
-    return [cand("occlusion", tile, [int(i)] + ([o["by"]] if o["by"] is not None else []), covered=o["covered"])
-            for i, o in tile.occlusion.items() if o["covered"] >= min_cover]
+    """Covered interactive elements. The coverer is named by its fixed/sticky root when it has one (the whole banner),
+    not by whichever inner element one of the five sample points happened to hit, so the finding key is stable."""
+    by_id = {e.id: e for e in tile.elements}
+    out = []
+    for i, o in tile.occlusion.items():
+        if o["covered"] < min_cover:
+            continue
+        ids = [int(i)]
+        if o["by"] is not None:
+            hit = by_id.get(o["by"])
+            root = pinned_root(hit, by_id) if hit else None
+            ids.append(root.id if root else o["by"])
+        out.append(cand("occlusion", tile, ids, covered=o["covered"]))
+    return out
+
+
+def drop_explained_collisions(tile: Tile, found: list[Candidate]) -> list[Candidate]:
+    """A collision between a covered element and something inside its occluder is the same defect as the occlusion:
+    report it once. (Otherwise one defect has two keys, and a small layout shift can make the second look new.)"""
+    occ = [c for c in found if c.type == "occlusion" and len(c.elements) == 2]
+    if not occ:
+        return found
+    children: dict[int, list[int]] = defaultdict(list)
+    for e in tile.elements:
+        if e.parent is not None:
+            children[e.parent].append(e.id)
+
+    def subtree(root: int) -> set[int]:
+        out, stack = set(), [root]
+        while stack:
+            x = stack.pop()
+            out.add(x)
+            stack += children.get(x, [])
+        return out
+
+    covered = [(o.elements[0], subtree(o.elements[1])) for o in occ]
+    return [c for c in found if not (c.type == "collision" and any(
+        (a in c.elements and (set(c.elements) - {a}) <= inside) for a, inside in covered))]
 
 
 def small_targets(tile: Tile, min_px: float = 24):
@@ -207,8 +243,8 @@ def run_oracles(cap: Capture) -> list[Candidate]:
     out: list[Candidate] = []
     for i, tile in enumerate(cap.tiles):
         by_id = {e.id: e for e in tile.elements}
-        found = [*viewport_protrusion(cap, tile), *collisions(tile), *clipped_text(tile),
-                 *element_protrusion(tile), *occlusions(tile), *small_targets(tile)]
+        found = drop_explained_collisions(tile, [*viewport_protrusion(cap, tile), *collisions(tile), *clipped_text(tile),
+                                                 *element_protrusion(tile), *occlusions(tile), *small_targets(tile)])
         for c in found:
             if not all(on_screen(cap, by_id[x]) for x in c.elements if x in by_id):
                 continue

@@ -30,13 +30,16 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 - `make test`: run pytest. Oracle and scan tests drive real Chromium; set `FIXEL_CHROMIUM_PATH` to a Chromium binary if Playwright's own download is absent (the test conftest defaults it to `/opt/pw-browsers/chromium` when present).
 - `fixel scan --static tests/fixtures/site --route /index.html --widths 320 1440`: geometry-only scan of the planted-bug fixture site. Without `--static`, it scans the running app at `target.base_url`.
 - `make targets`: init the target submodules and `npm install` each app. Then `fixel scan --config targets/iiitu-acm.yaml` starts that app's dev server itself (with the data-loc plugin), scans it, and stops it.
+- `fixel fix --config targets/demo-shop.yaml --list`: scan the target in an isolated worktree and list the confirmed findings; then `--index N` or `--finding <text in key>` runs the fix agent on one (live model calls). Exports a `.patch` only if the model-free verifier passes.
 - `make demo-smoke`: run the demo path from cache (`FIXEL_MODE=replay`); the test it runs is not written yet.
 
 ## Status
 
-Working end to end for detection: `fixel scan` captures each state, runs the geometry oracles, the opacity diff and SAM 3.1 box prompts, triages with Spark 1.3, and fuses the result into findings. Built: `models.py`, `store.py`, `config.py`, `target.py` (starts/stops a target's dev server), `meta/client.py` (cache, modes, retry), `meta/sam.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `cli.py`, and the data-loc Vite plugin in `tooling/`. Targets are submodules in `targets/` (see `targets/README.md`). Spike results and the guide's answered open questions are in `docs/SPIKES.md`.
+The scan-to-verified-fix loop works end to end. `fixel scan` detects (geometry oracles, opacity diff, SAM 3.1, Spark triage, fusion) and `fixel fix` repairs: an isolated git worktree, a Wonder tool-calling agent whose edits pass the symptom-hiding linter, and a model-free verifier over the whole width x theme matrix. Verified live on all three planted defects of `targets/demo-shop` (see `docs/SPIKES.md`).
 
-Still stubs: source localization via CDP, the whole fix side (`fix/`: Wonder agent, worktree, linter), the verifier, the explorer, `bench/`, the API and the UI. Next in the build plan (guide section 13): data-loc/CDP fix context, worktree, fix agent with a search/replace edit tool, linter, then the model-free verifier.
+Built: `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/` (submodules plus the vendored `demo-shop`).
+
+Still stubs: `api/server.py` (REST + event stream), the React UI (`web/`), `bench/` (mutations, corpus, metrics, ablations), `explore/cua.py`, `meta/{voice,image,spark}.py`. Next in the build plan (guide section 13): API and event stream, then the UI, then the benchmark and human labelling.
 
 ## Deviations from the guide
 
@@ -56,6 +59,14 @@ Still stubs: source localization via CDP, the whole fix side (`fix/`: Wonder age
 - **Candidates are kept only in tiles where their elements are on screen** (`oracles.on_screen`); the snapshot lists off-screen elements too. Contrast is placed in the first tile that shows the element.
 - **Triage output is validated inside the cached call**, so an out-of-range answer is retried and never cached.
 - **Key variable:** `MODEL_API_KEY`, or `META_MODEL_API` (the name this environment stores it under).
+
+- **Fix edits are exact search/replace (`edit_file`), not model-written unified diffs.** Wonder needed four tries on a trivial fix because its hunk headers were wrong. The diff the linter and verifier see is always `git diff` of the worktree, so it is well-formed. Each edit is linted and reverted if blocked, so a blocked edit never stays in the tree.
+- **Agent turns are stateless** (the whole transcript is sent each turn; Wonder accepts its own output items as input), so every turn goes through `call()` and is cached and replayable. The guide's `previous_response_id` would not be. Token counts include live calls only.
+- **Worktrees live under Fixel's `.fixel/wt/<target>/`**, not inside the target repo (which would show up as untracked files there). `node_modules` is symlinked in; paths are confined to the app directory and never touch `node_modules` or `.git`.
+- **`fix/lint.py` is stricter than the guide's**: it parses hunks by their counts (a removed line starting with `--` is not a header), also blocks truncation (`truncate`, ellipsis, line-clamp), collapsing (`w-0`, `width:0`, `scale(0)`), off-screen positioning, transparent text, `clip`/`clip-path`, `pointer-events: none` (defeats the hit test) and removing elements, and only treats a string as a class list inside a `className`/`clsx`-style context or when it is utility-shaped.
+- **The verifier's line remap is exact** (old->new line map from each hunk's context, so elements on trailing context lines inside a hunk are remapped too; the guide only shifts lines after a hunk). Drift lets ancestors of the fixed region grow taller (their content grew) while still flagging sideways movement; the fix container is everything under the parent of the finding's nearest common ancestor.
+- **Finding keys must be stable under small layout shifts.** An occlusion names its coverer by its fixed/sticky root (not the inner element a sample point hit), and a collision already explained by an occlusion is dropped. Without this the same cookie-banner defect appeared "new" after an unrelated patch and pushed the model into scope creep.
+- **Oracle gaps found by tests:** text spilling out of a narrow box now counts as viewport protrusion; protruding siblings are reported once as their protruding parent.
 
 ## Build order and cut order
 
