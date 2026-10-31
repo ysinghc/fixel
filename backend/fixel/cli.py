@@ -188,7 +188,8 @@ def cmd_bench(args) -> int:
     if args.bench_cmd == "run":
         levels = rb.LEVELS if args.models == "all" else rb.LEVELS[:2] if args.models == "none" else rb.LEVELS[:3]
         bc = rb.BenchConfig(split=args.split, n_mutated=args.mutated, n_clean=args.clean, seed=args.seed, levels=levels,
-                            widths=args.widths, targets=args.targets, budget_usd=args.budget, ops=args.ops, parallel=args.parallel)
+                            widths=args.widths, targets=args.targets, budget_usd=args.budget, ops=args.ops, parallel=args.parallel,
+                            out=Path(args.out) if args.out else None)
         out = asyncio.run(rb.run_bench(bc))
         print(metrics.render(metrics.compute(out)))
         return 0
@@ -251,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     br.add_argument("--ops", nargs="+", help="only these mutation operators")
     br.add_argument("--budget", type=float, default=10.0)
     br.add_argument("--parallel", type=int, default=4)
+    br.add_argument("--out", help="run directory (default .fixel/bench/<timestamp>-<split>-s<seed>)")
     br.set_defaults(fn=cmd_bench)
     bp = bsub.add_parser("report", help="print the report for a finished run (with --labels: add human-label metrics)")
     bp.add_argument("run", help="run id or directory")
