@@ -130,6 +130,14 @@ def score(op: Mutation | None, target_loc: str | None, base: list[dict] | None, 
             "other_new": [f["key"] for f in new_confirmed if f["type"] not in op.hits]}
 
 
+async def guard(name: str, coro, failures: list):
+    """Run one case; a failure is recorded (and reported in the run's metadata and caveats), never allowed to end the run."""
+    try:
+        return await coro
+    except Exception as e:
+        failures.append({"case": name, "error": f"{type(e).__name__}: {str(e)[:160]}"})
+
+
 def git_state() -> dict:
     try:
         sha = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
@@ -161,6 +169,7 @@ async def run_bench(bc: BenchConfig, say=print) -> Path:
 
     stats = {"skipped_no_target": 0, "skipped_unstable": 0, "unfinished": 0}   # unstable: did not re-tag identically, or the injection declined
     sem = asyncio.Semaphore(bc.parallel)
+    failures: list[dict] = []
     async with AsyncExitStack() as stack:
         urls = {}
         for c in confs:
@@ -234,8 +243,8 @@ async def run_bench(bc: BenchConfig, say=print) -> Path:
             block = list(ops)
             random.Random(f"{bc.seed}:ops:{r}").shuffle(block)
             order += block
-        jobs = [clean_case(i, c, s) for i, (c, s) in enumerate(clean_pool)]
-        jobs += [mutated_case(i, op) for i, op in enumerate(order[:bc.n_mutated])]
+        jobs = [guard(f"clean-{i:03d}", clean_case(i, c, s), failures) for i, (c, s) in enumerate(clean_pool)]
+        jobs += [guard(f"mutated-{i:03d}-{op.name}", mutated_case(i, op), failures) for i, op in enumerate(order[:bc.n_mutated])]
         done = 0
         for fut in asyncio.as_completed(jobs):
             await fut
@@ -246,7 +255,7 @@ async def run_bench(bc: BenchConfig, say=print) -> Path:
     n_cases = len(list((out / "cases").glob("*.json")))
     meta_doc = {"run": run_id, "split": bc.split, "seed": bc.seed, "levels": list(levels), "mode": meta.mode(),
                 "targets": [c.target.name for c in confs], "n_states_in_pool": len(pool), "n_cases": n_cases,
-                "requested": {"mutated": bc.n_mutated, "clean": len(clean_pool)}, **stats, "usd": round(spend.usd, 4),
+                "requested": {"mutated": bc.n_mutated, "clean": len(clean_pool)}, **stats, "n_failed": len(failures), "failed_cases": failures[:25], "usd": round(spend.usd, 4),
                 "model_calls": spend.calls, "seconds": round(time.time() - t0, 1), "code": git_state(),
                 "ops": [o.name for o in ops], "created": time.time(), "widths": bc.widths,
                 "note": "Every case with kind 'mutated' has an injected defect or control; 'clean' cases are unmodified pages."}

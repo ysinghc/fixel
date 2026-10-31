@@ -21,6 +21,8 @@ from .oracles import box, inter
 HIDE_JS = ("([s, hide]) => { const e = document.querySelector(s); if (!e) return null; const p = e.style.opacity;"
            " if (hide) { e.style.setProperty('opacity', '0', 'important'); return p; }"
            " e.style.opacity = p; return p; }")
+# the element may be gone by now (a live-updating page re-rendered it): restoring must not throw
+RESTORE_JS = "([s, p]) => { const e = document.querySelector(s); if (e) e.style.opacity = p; }"
 PIXEL_TOL = 24                                # summed RGB difference that counts as a changed pixel
 
 
@@ -50,7 +52,7 @@ async def hidden_diff(page, scroll_y: int, hide_id: int, rects: list[tuple]) -> 
     try:
         after = to_np(await page.screenshot(animations="disabled"))
     finally:
-        await page.evaluate("([s, p]) => { document.querySelector(s).style.opacity = p; }", [sel, prev])
+        await page.evaluate(RESTORE_JS, [sel, prev])
     h, w = before.shape[:2]
     mask = np.zeros((h, w), bool)
     for x1, y1, x2, y2 in rects:
@@ -71,7 +73,7 @@ async def paints_alone(page, scroll_y: int, hide_id: int, probe_id: int, rects: 
     try:
         return await hidden_diff(page, scroll_y, probe_id, rects)
     finally:
-        await page.evaluate("([s, p]) => { document.querySelector(s).style.opacity = p; }", [sel, prev])
+        await page.evaluate(RESTORE_JS, [sel, prev])
 
 
 async def opacity_diff(page, scroll_y: int, a: Element, b: Element, full_boxes: bool = False) -> float:

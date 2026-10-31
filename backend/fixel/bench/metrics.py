@@ -171,6 +171,8 @@ def compute(run: Path, labels: dict[str, str] | None = None) -> dict:
     if meta.get("skipped_no_target") or meta.get("unfinished"):
         out["caveats"].append(f"{meta.get('unfinished', 0)} requested cases could not be placed (an operator found no target); "
                               f"{meta.get('skipped_no_target', 0)} placement attempts were skipped.")
+    if meta.get("n_failed"):
+        out["caveats"].append(f"{meta['n_failed']} cases crashed (for example: {(meta.get('failed_cases') or [{}])[0].get('error', '?')}) and are missing from every number here.")
     missing = {l: sum(c["levels"].get(l) is None for c in cases) for l in ("sam", "spark") if l in meta.get("levels", [])}
     if any(missing.values()):
         out["caveats"].append("Cases whose model level failed are excluded from that level: " + ", ".join(f"{l} {n}" for l, n in missing.items() if n))

@@ -51,6 +51,22 @@ def test_a_missing_level_scores_none_and_is_never_copied_from_the_level_below():
     assert score(BY_NAME["fixed_width"], "a", [], None) is None
 
 
+def test_one_crashing_case_is_recorded_and_does_not_end_the_run():
+    import asyncio
+    from fixel.bench.run_bench import guard
+
+    async def boom():
+        raise RuntimeError("page closed")
+
+    async def fine():
+        return 7
+    failures: list = []
+    async def both():
+        return await asyncio.gather(guard("a", boom(), failures), guard("b", fine(), failures))
+    got = asyncio.run(both())
+    assert got == [None, 7] and failures == [{"case": "a", "error": "RuntimeError: page closed"}]
+
+
 # ----------------------------------------------------------------------------- a run on disk
 def case(cid, kind, level_findings, op=None, base=None, loc="a.jsx:1"):
     o = BY_NAME[op] if op else None

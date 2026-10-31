@@ -87,3 +87,15 @@ def test_outside_strips_cover_only_the_protruding_part():
     strips = outside((100, 10, 300, 50), (0, 0, 200, 100))        # child sticks out 100px on the right
     assert strips == [(200, 10, 300, 50)]
     assert outside((10, 10, 50, 50), (0, 0, 200, 100)) == []
+
+
+def test_restoring_opacity_does_not_throw_when_the_element_is_gone(tmp_path):
+    # found by the first test-split run: a live-updating page removed the element between hide and restore
+    from fixel.detect.pixels import RESTORE_JS
+
+    async def go():
+        async with Browsers() as browser:
+            page = await (await new_context(browser)).new_page()
+            await page.set_content("<p>x</p>")
+            await page.evaluate(RESTORE_JS, ['[data-fixel-id="999"]', ""])
+    asyncio.run(go())
