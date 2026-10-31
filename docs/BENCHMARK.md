@@ -39,6 +39,20 @@ fixel bench export <run>                                     # copy metrics, lab
 Runs live under `.fixel/bench/<run>/` (gitignored): `meta.json`, `cases/*.json`, `label_queue.json`, `labels.json`.
 A run is reproducible from its seed. Every model call is cached, so rerunning costs nothing and `FIXEL_MODE=replay` spends nothing.
 
+## Labelling on your own machine
+
+The labelling UI needs the run's screenshots, which live in the gitignored `.fixel/` of the machine that ran it. Pack and move them:
+
+```bash
+fixel bench bundle <run>                 # on the machine that ran it: one tar.gz, the run plus exactly its screenshots
+fixel bench import <run>.bench.tar.gz    # on the labelling machine: unpacks into .fixel/
+make serve                               # label in the Label tab (blind: the queue API never returns the operator, kind or Fixel output)
+fixel bench export <run>                 # writes docs/bench/<run>/labels.json (plus metrics) to commit and push back
+fixel bench report <run> --labels-file docs/bench/<run>/labels.json    # recompute metrics with those labels
+```
+
+A bundle has no labels; labels belong to whoever made them. Importing refuses anything outside `bench/` and `artifacts/`.
+
 ## Detection levels (the ablation)
 
 Every case is analysed at four cumulative levels on the *same* captured page, so differences are the layers' alone:
@@ -75,6 +89,18 @@ A finding counts as *new* only if it was absent from the unmodified state at tha
 - **Replay mode** is marked on the run and in the UI.
 - Intervals are 95% Wilson. With a few hundred cases they are wide; a small difference between levels is not a result.
 - A run records the commit and whether `backend/` or `tooling/` had uncommitted changes.
+
+## The test-split run (seed 7)
+
+Run `20261031-093745-test-s7`: 150 injected + 50 unmodified cases, all four levels, `record` mode, $2.52, 55 minutes, no case crashed.
+**Only `e-broker` was run; `aavesh` (the other test target) was excluded.** Its WebGL scene pins the CPU: the first attempt that
+included it finished 8 cases in 30 minutes, so it was excluded for feasibility, before any result was read. The test split is therefore one
+Next.js app with five routes, which is a weaker claim about generalization than two apps, and the report and the Benchmark tab say so.
+An earlier attempt also aborted on a crashing case (fixed: restore is null-safe, cases are guarded and counted). Neither aborted
+attempt's results were read.
+
+Nothing about detection was changed after this run started, and nothing should be: this run is the test split, so changing detection
+code after seeing its numbers makes them no longer clean (use a new seed and fresh labels if that happens).
 
 ## Known gaps the benchmark has found (development split)
 

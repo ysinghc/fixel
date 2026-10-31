@@ -149,7 +149,9 @@ def git_state() -> dict:
 
 async def run_bench(bc: BenchConfig, say=print) -> Path:
     """Run the benchmark and return the run directory."""
-    confs = [c for c in corpus.target_configs(bc.split) if not bc.targets or c.target.name in bc.targets]
+    all_confs = corpus.target_configs(bc.split)
+    confs = [c for c in all_confs if not bc.targets or c.target.name in bc.targets]
+    excluded = [c.target.name for c in all_confs if c not in confs]
     ops = [BY_NAME[n] for n in bc.ops] if bc.ops else list(OPS)
     levels = tuple(l for l in bc.levels if l in LEVELS)
     if any(l in levels for l in ("sam", "spark")) and not models_available():
@@ -255,7 +257,7 @@ async def run_bench(bc: BenchConfig, say=print) -> Path:
     n_cases = len(list((out / "cases").glob("*.json")))
     meta_doc = {"run": run_id, "split": bc.split, "seed": bc.seed, "levels": list(levels), "mode": meta.mode(),
                 "targets": [c.target.name for c in confs], "n_states_in_pool": len(pool), "n_cases": n_cases,
-                "requested": {"mutated": bc.n_mutated, "clean": len(clean_pool)}, **stats, "n_failed": len(failures), "failed_cases": failures[:25], "usd": round(spend.usd, 4),
+                "requested": {"mutated": bc.n_mutated, "clean": len(clean_pool)}, **stats, "excluded_targets": excluded, "n_failed": len(failures), "failed_cases": failures[:25], "usd": round(spend.usd, 4),
                 "model_calls": spend.calls, "seconds": round(time.time() - t0, 1), "code": git_state(),
                 "ops": [o.name for o in ops], "created": time.time(), "widths": bc.widths,
                 "note": "Every case with kind 'mutated' has an injected defect or control; 'clean' cases are unmodified pages."}

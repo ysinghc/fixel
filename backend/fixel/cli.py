@@ -184,7 +184,7 @@ def cmd_serve(args) -> int:
 
 
 def cmd_bench(args) -> int:
-    from .bench import metrics, run_bench as rb
+    from .bench import bundle, metrics, run_bench as rb
     if args.bench_cmd == "run":
         levels = rb.LEVELS if args.models == "all" else rb.LEVELS[:2] if args.models == "none" else rb.LEVELS[:3]
         bc = rb.BenchConfig(split=args.split, n_mutated=args.mutated, n_clean=args.clean, seed=args.seed, levels=levels,
@@ -193,11 +193,19 @@ def cmd_bench(args) -> int:
         out = asyncio.run(rb.run_bench(bc))
         print(metrics.render(metrics.compute(out)))
         return 0
+    if args.bench_cmd == "import":
+        print(f"imported run {bundle.import_bundle(Path(args.archive))} into .fixel/ (label it in the Label tab)")
+        return 0
     run = Path(args.run) if Path(args.run).exists() else rb.ROOT / args.run
+    if args.bench_cmd == "bundle":
+        print(f"wrote {bundle.bundle(run, Path(args.dest) if args.dest else None)}")
+        return 0
     if args.bench_cmd == "export":
         print(f"wrote {metrics.export(run, args.dest)}")
         return 0
-    print(metrics.render(metrics.compute(run, labels=metrics.load_labels(run) if args.labels else None)))
+    labels = bundle.labels_from_file(Path(args.labels_file)) if getattr(args, "labels_file", None) else \
+        (metrics.load_labels(run) if args.labels else None)
+    print(metrics.render(metrics.compute(run, labels=labels)))
     return 0
 
 
@@ -257,7 +265,15 @@ def main(argv: list[str] | None = None) -> int:
     bp = bsub.add_parser("report", help="print the report for a finished run (with --labels: add human-label metrics)")
     bp.add_argument("run", help="run id or directory")
     bp.add_argument("--labels", action="store_true")
+    bp.add_argument("--labels-file", help="use the labels in this labels.json (made on another machine) instead of the run's own")
     bp.set_defaults(fn=cmd_bench)
+    bb = bsub.add_parser("bundle", help="pack a run and its screenshots into one file, to label it on another machine")
+    bb.add_argument("run", help="run id or directory")
+    bb.add_argument("--dest")
+    bb.set_defaults(fn=cmd_bench)
+    bi = bsub.add_parser("import", help="unpack a bundle into .fixel/ so it can be labelled here")
+    bi.add_argument("archive")
+    bi.set_defaults(fn=cmd_bench)
     bx = bsub.add_parser("export", help="copy a run's metrics, report, labels and per-case summary to docs/bench/<run> for committing")
     bx.add_argument("run", help="run id or directory")
     bx.add_argument("--dest")
