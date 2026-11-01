@@ -33,7 +33,7 @@ Python backend (FastAPI, asyncio, Playwright) plus a React UI. Pipeline: plan st
 - `fixel fix --config targets/demo-shop.yaml --list`: scan the target in an isolated worktree and list the confirmed findings; then `--index N` or `--finding <text in key>` runs the fix agent on one (live model calls). Exports a `.patch` only if the model-free verifier passes.
 - `make web`: build the React UI into `web/dist`. `make serve` (or `fixel serve [--budget USD]`) runs the API and serves the UI at `http://127.0.0.1:8765`; `make web-dev` is the hot-reload dev server proxying `/api`.
 - `fixel bench run --split dev --mutated 60 --clean 20` (also `make bench-dev`): the detection benchmark; `fixel bench report <run> --labels`, `fixel bench export <run>` (copies results to `docs/bench/`). Protocol and reporting rules: `docs/BENCHMARK.md`. Label in the UI's Label tab.
-- `make demo-smoke`: run the demo path from cache (`FIXEL_MODE=replay`); the test it runs is not written yet.
+- `make demo-smoke`: the demo path (scan with SAM and Spark triage, then all three demo-shop fixes verified) served from the committed recording `tests/demo_cache` with `FIXEL_MODE=replay`, no key and no network (about 2 minutes). `FIXEL_CACHE_DIR` points `call()` at another cache; the recording is refreshed with the commands in `tests/test_demo_smoke.py`. Never put non-synthetic data in it.
 
 ## Status
 
@@ -41,7 +41,7 @@ The scan-to-verified-fix loop works end to end. `fixel scan` detects (geometry o
 
 Built: `bench/{mutations,corpus,run_bench,metrics,labelling}.py`, `api/{db,runs,server}.py`, `cost.py`, `web/` (React UI), `models.py`, `store.py`, `config.py`, `env.py`, `target.py`, `scan.py`, `cli.py`, `meta/{client,sam}.py`, `capture/`, `detect/{oracles,pixels,triage,fuse}.py`, `localize/cdp_styles.py`, `fix/{lint,worktree,tools,agent}.py`, `verify/{drift,matrix}.py`, and the data-loc Vite plugin in `tooling/`. Targets are in `targets/`: development `iiitu-acm`, `pastebin`; test `aavesh`, `e-broker` (Next.js: data-loc via the webpack loader); plus the vendored planted-defect `demo-shop`. Never tune on the test split.
 
-Still stubs: the fix benchmark (source-level mutations, verified-fix rate; the detection benchmark and labelling are built), `explore/cua.py`, `meta/{voice,image,spark}.py`, SAM mask decoding, Storybook and synthetic corpora. Next: label the test-split run, then the fix benchmark, then the replay demo smoke test.
+Still stubs: the fix benchmark (source-level mutations, verified-fix rate; the detection benchmark and labelling are built), `explore/cua.py`, `meta/{voice,image,spark}.py`, SAM mask decoding, Storybook and synthetic corpora. The replay demo smoke test is built. Next: label the test-split run, then the fix benchmark.
 
 ## Deviations from the guide
 

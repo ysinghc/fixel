@@ -87,3 +87,17 @@ async def test_retry_does_not_resend_a_400():
     with pytest.raises(APIStatusError):
         await client.retry(fn)
     assert len(n) == 1
+
+
+async def test_fixel_cache_dir_redirects_record_and_replay(tmp_path, monkeypatch):
+    other = tmp_path / "recording"
+    monkeypatch.setenv("FIXEL_CACHE_DIR", str(other))
+    monkeypatch.setenv("FIXEL_MODE", "record")
+
+    async def fn():
+        return {"json": "{}"}
+
+    await client.call("spark.triage", {"img": "abc"}, fn)
+    assert list((other / "spark.triage").glob("*.json")) and not (tmp_path / "cache").exists()
+    monkeypatch.setenv("FIXEL_MODE", "replay")
+    assert await client.call("spark.triage", {"img": "abc"}, fn) == {"json": "{}"}

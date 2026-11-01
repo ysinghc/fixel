@@ -14,6 +14,11 @@ from openai import APIConnectionError, APIStatusError, AsyncOpenAI
 
 CACHE = Path(".fixel/cache")
 
+
+def cache_dir() -> Path:
+    """FIXEL_CACHE_DIR points record and replay at another cache (the committed demo recording); read per call like the mode."""
+    return Path(os.environ.get("FIXEL_CACHE_DIR") or CACHE)
+
 _client: AsyncOpenAI | None = None
 
 
@@ -53,7 +58,7 @@ def key_of(kind: str, payload: dict) -> str:
 async def call(kind: str, payload: dict, fn, emit=None) -> dict:
     """payload holds image SHAs, never image bytes, so keys stay small and stable."""
     m = mode()
-    path = CACHE / kind / f"{key_of(kind, payload)}.json"
+    path = cache_dir() / kind / f"{key_of(kind, payload)}.json"
     if m != "live" and path.exists():
         out, src = json.loads(path.read_text()), "cached"
     elif m == "replay":
