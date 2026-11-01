@@ -12,7 +12,7 @@ export function Runs() {
   useEffect(() => { api.runs().then(rs => setRuns(rs.filter(r => r.kind === 'scan'))).catch(() => setRuns([])) }, [])
 
   return (
-    <div className="mx-auto max-w-5xl p-8" data-testid="runs">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="runs">
       <PageHeader title="Results" subtitle="Every scan, newest first. Open one to see its findings." actions={<ButtonLink to={paths.scan} kind="primary" size="md">New scan</ButtonLink>} />
       {runs === null ? <div className="skeleton h-40 rounded-xl" /> : runs.length === 0 ? (
         <Empty title="No scans yet" testid="runs-empty" action={<ButtonLink to={paths.scan} kind="primary" size="md">Start a scan</ButtonLink>}>Results appear here as soon as a scan starts.</Empty>

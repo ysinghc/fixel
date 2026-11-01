@@ -183,6 +183,28 @@ function WidthScrubber() {
   )
 }
 
+/** The largest box of the screen's aspect ratio that fits the measured space; image and overlay share it, so boxes line up. */
+function useFit(vw: number, vh: number) {
+  const [el, setEl] = useState<HTMLDivElement | null>(null)
+  const [avail, setAvail] = useState<{ w: number; h: number } | null>(null)
+  useEffect(() => {
+    if (!el) return
+    const measure = () => {
+      const cs = getComputedStyle(el)
+      setAvail({
+        w: el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+        h: el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom),
+      })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [el])
+  const k = avail && avail.w > 0 && avail.h > 0 ? Math.min(avail.w / vw, avail.h / vh) : 0
+  return { ref: setEl, fit: k ? { w: Math.floor(vw * k), h: Math.floor(vh * k) } : null }
+}
+
 /** One rendered screen with its overlay. Reads the selected state and tile from the store. */
 export function Viewer({ title }: { title?: string }) {
   const stateKey = useStore(s => s.stateKey)
@@ -193,6 +215,7 @@ export function Viewer({ title }: { title?: string }) {
   useEffect(() => { if (stateKey) void loadDetail(stateKey) }, [stateKey, loadDetail])
 
   const t = st?.tiles[tile]
+  const { ref: frameRef, fit } = useFit(st?.vw ?? st?.width ?? 1, st?.vh ?? st?.height ?? 1)
   if (!st || !t) {
     return <div className="grid min-h-0 flex-1 place-items-center p-8" data-testid="viewer-loading"><div className="skeleton h-64 w-48 rounded-lg" /></div>
   }
@@ -217,8 +240,8 @@ export function Viewer({ title }: { title?: string }) {
         )}
         <div className="ml-auto"><LayerMenu /></div>
       </div>
-      <div className="relative min-h-0 flex-1 overflow-auto px-4 pb-2">
-        <div className="mx-auto h-full" style={{ aspectRatio: `${st.vw ?? st.width} / ${st.vh ?? st.height}`, maxWidth: '100%', maxHeight: '100%' }}>
+      <div ref={frameRef} className="relative flex min-h-72 min-w-0 flex-1 items-center justify-center overflow-hidden px-4 pb-2">
+        <div className="flex-none" style={fit ? { width: fit.w, height: fit.h } : { aspectRatio: `${st.vw ?? st.width} / ${st.vh ?? st.height}`, maxHeight: '100%', maxWidth: '100%' }}>
           <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-white shadow-2xl shadow-black/50" data-testid="tile">
             <img key={t.sha} src={api.artifact(t.sha)} alt={`${st.route} at ${st.width}px`} className="absolute inset-0 h-full w-full" draggable={false} />
             <Overlay />

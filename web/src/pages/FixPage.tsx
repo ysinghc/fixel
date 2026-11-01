@@ -108,7 +108,7 @@ export function FixPage() {
 
   if (!fix) {
     return (
-      <div className="mx-auto max-w-5xl p-8" data-testid="fix-loading">
+      <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="fix-loading">
         <Link to={paths.run(runParam)} className="text-xs text-muted hover:text-zinc-200">← All findings</Link>
         <h1 className="mt-1 text-xl font-semibold">Starting the fix…</h1>
         <div className="skeleton mt-6 h-40 rounded-xl" />
@@ -121,7 +121,7 @@ export function FixPage() {
   const blocked = fix.patches.filter(p => p.lint.length).length
 
   return (
-    <div className="mx-auto max-w-6xl p-8" data-testid="fix-page" data-fix={fix.id}>
+    <div className="mx-auto max-w-6xl p-4 md:p-8" data-testid="fix-page" data-fix={fix.id}>
       <header className="mb-5 flex flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
           <Link to={paths.finding(runParam, fix.key)} className="text-xs text-muted hover:text-zinc-200" data-testid="back">← Back to the finding</Link>

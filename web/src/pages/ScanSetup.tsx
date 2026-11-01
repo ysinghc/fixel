@@ -61,7 +61,7 @@ export function ScanSetup() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-8" data-testid="scan-setup">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="scan-setup">
       <PageHeader title="New scan" subtitle="Pick an app and its pages. Fixel renders each one at every width and theme, then checks what is actually painted." />
       <div className="grid items-start gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">

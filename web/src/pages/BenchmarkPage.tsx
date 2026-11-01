@@ -60,13 +60,13 @@ export function BenchmarkPage() {
   }, [run])
   useEffect(() => { if (m?.human) setMeasure('precision') }, [m?.human])
 
-  if (!list) return <div className="mx-auto max-w-5xl p-8" data-testid="bench"><div className="skeleton h-40 rounded-xl" /></div>
+  if (!list) return <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="bench"><div className="skeleton h-40 rounded-xl" /></div>
   if (!list.available) {
     return (
-      <div className="mx-auto max-w-5xl p-8" data-testid="bench">
+      <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="bench">
         <PageHeader title="Benchmark" subtitle="How well Fixel finds layout bugs, measured against people and known answers." />
-        <Empty title="Not available yet" icon="▥" testid="bench-none">
-          <p>Not available yet: {list.reason ?? 'no benchmark has been run'}.</p>
+        <Empty title="Not available yet" icon="▦" testid="bench-none">
+          <p>{(list.reason ?? 'no benchmark has been run').split('`').map((part, i) => i % 2 ? <code key={i} className="whitespace-nowrap rounded bg-black/40 px-1 py-0.5 font-mono text-xs text-zinc-300">{part}</code> : part)}</p>
           <pre className="mt-3 rounded-lg bg-black/40 p-2 text-left text-xs text-zinc-300">fixel bench run --split dev --mutated 60 --clean 20</pre>
           <p className="mt-3 text-xs">No number is shown until it is measured.</p>
         </Empty>
@@ -90,7 +90,7 @@ export function BenchmarkPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-5xl p-8" data-testid="bench">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="bench">
       <PageHeader title="Benchmark" subtitle="How well Fixel finds layout bugs, measured against blind human labels and cases with known answers."
         actions={(
           <select value={run} onChange={e => setRun(e.target.value)} data-testid="bench-run" className="h-9 rounded-lg border border-line bg-raised px-2 text-xs">

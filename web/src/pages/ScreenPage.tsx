@@ -20,14 +20,14 @@ export function ScreenPage() {
   useEffect(() => () => useStore.getState().set({ stateKey: null }), [])
 
   return (
-    <div className="flex h-full flex-col px-6 pb-4 pt-5" data-testid="screen-page">
+    <div className="flex min-h-full flex-col px-4 pb-4 pt-5 md:h-full md:px-6" data-testid="screen-page">
       <header className="flex-none pb-4">
         <Link to={paths.screens(run)} className="text-xs text-muted hover:text-zinc-200" data-testid="back">← All screens</Link>
         <h1 className="mt-1 text-xl font-semibold tracking-tight">One screen</h1>
       </header>
-      <div className="flex min-h-0 flex-1 gap-5">
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-ink"><Viewer /></div>
-        <aside className="w-[300px] flex-none overflow-y-auto">
+      <div className="flex flex-1 flex-col gap-5 md:min-h-0 md:flex-row">
+        <div className="flex h-[75vh] min-w-0 flex-none flex-col overflow-hidden rounded-xl border border-line bg-ink md:h-auto md:flex-1"><Viewer /></div>
+        <aside className="w-full flex-none md:w-[300px] md:overflow-y-auto">
           <h2 className="mb-2 text-[13px] font-semibold">Findings on this screen</h2>
           {here.length === 0 ? <p className="text-xs text-muted">None. Widths with findings are the ones with a red count on the Screens page.</p> : (
             <ul className="space-y-1.5">

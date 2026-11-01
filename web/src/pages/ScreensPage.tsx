@@ -30,7 +30,7 @@ export function ScreensPage() {
     all.find(s => s.route === route && s.width === w && s.theme === theme && s.text_stress === stress)
 
   return (
-    <div className="mx-auto max-w-6xl p-8" data-testid="screens-page">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="screens-page">
       <RunHeader />
       <p className="mb-4 text-xs text-muted">Every screen Fixel rendered. The red number is how many confirmed findings it shows. Open one to inspect it.</p>
       {routes.length === 0 && <div className="skeleton h-48 rounded-xl" />}

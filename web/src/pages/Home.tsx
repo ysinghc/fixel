@@ -46,7 +46,7 @@ export function Home() {
   const left = labelRun ? (labelRun.queue ?? labelRun.n_cases) - labelRun.labelled : null
 
   return (
-    <div className="mx-auto max-w-5xl p-8" data-testid="home">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="home">
       <PageHeader title="What would you like to do?" subtitle="Fixel renders your pages at every screen width, finds layout bugs in the pixels, and fixes them with proof." />
 
       <div className="grid gap-4 md:grid-cols-3">

@@ -12,7 +12,7 @@ const TILE_TONE: Record<Status, string> = { confirmed: 'text-red-300', needs_rev
 function FixBadge({ f }: { f: Finding }) {
   const fix = useStore(s => Object.values(s.fixes).filter(x => x.key === f.key).at(-1))
   if (!fix) return null
-  if (fix.status === 'verified') return <Chip tone="green" className="font-medium">Fixed ✓</Chip>
+  if (fix.status === 'verified') return <Chip tone="green" className="flex-none whitespace-nowrap font-medium">Fixed ✓</Chip>
   if (isBusy(fix)) return <Chip tone="blue">Fixing…</Chip>
   return <Chip tone="red">Fix not verified</Chip>
 }
@@ -30,10 +30,10 @@ function FindingRow({ f, runId }: { f: Finding; runId: string }) {
           </div>
           <p className="mt-0.5 truncate text-xs text-muted">{f.triage?.what_the_user_sees ?? TYPE_EXPLAIN[f.type]}</p>
         </div>
-        <span className="hidden flex-none text-xs tabular-nums text-zinc-400 sm:block" title="Screen widths where it happens">{widthRange(f.widths)}</span>
+        <span className="hidden w-28 flex-none text-right text-xs tabular-nums text-zinc-400 sm:block" title="Screen widths where it happens">{widthRange(f.widths)}</span>
         {f.locs[0]
-          ? <code className="hidden max-w-48 flex-none truncate rounded bg-black/30 px-1.5 py-0.5 font-mono text-[11px] text-sky-300 md:block" title={f.locs.join('\n')}>{locLabel(f.locs[0])}</code>
-          : <span className="hidden flex-none text-[11px] text-muted md:block">no source link</span>}
+          ? <code className="hidden w-44 flex-none truncate rounded bg-black/30 px-1.5 py-0.5 font-mono text-[11px] text-sky-300 md:block" title={f.locs.join('\n')}>{locLabel(f.locs[0])}</code>
+          : <span className="hidden w-44 flex-none px-1.5 text-[11px] text-muted md:block">no source link</span>}
         <span className="flex-none text-muted">›</span>
       </Link>
     </li>
@@ -51,7 +51,7 @@ export function RunPage() {
   const list = sortedFindings(findings, tab)
 
   return (
-    <div className="mx-auto max-w-5xl p-8" data-testid="run-page">
+    <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="run-page">
       <RunHeader />
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4" role="tablist" data-testid="status-tiles">
         {STATUSES.map(s => (

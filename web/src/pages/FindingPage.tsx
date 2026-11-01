@@ -86,7 +86,7 @@ export function FindingPage() {
 
   if (!f) {
     return (
-      <div className="mx-auto max-w-3xl p-8">
+      <div className="mx-auto max-w-3xl p-4 md:p-8">
         {run && run.status !== 'running' && Object.keys(findings).length > 0
           ? <Empty title="This finding is not in this scan" testid="finding-missing" action={<ButtonLink to={paths.run(runParam)} kind="primary">All findings</ButtonLink>} />
           : <div className="skeleton h-96 rounded-xl" data-testid="finding-loading" />}
@@ -99,9 +99,9 @@ export function FindingPage() {
   const sentence = f.triage?.what_the_user_sees ?? TYPE_EXPLAIN[f.type]
 
   return (
-    <div className="flex h-full flex-col px-6 pb-4 pt-5" data-testid="finding-page" data-key={key}>
+    <div className="flex min-h-full flex-col px-4 pb-4 pt-5 md:h-full md:px-6" data-testid="finding-page" data-key={key}>
       <header className="flex flex-none flex-wrap items-end gap-4 pb-4">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-72">
           <Link to={paths.run(runParam)} className="text-xs text-muted hover:text-zinc-200" data-testid="back">← All findings</Link>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight" data-testid="finding-title">{TYPE_LABEL[f.type] ?? f.type}</h1>
@@ -124,11 +124,11 @@ export function FindingPage() {
       </header>
       {err && <div className="mb-3 flex-none rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" data-testid="card-error">{err}</div>}
 
-      <div className="flex min-h-0 flex-1 gap-5">
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-ink">
+      <div className="flex flex-1 flex-col gap-5 md:min-h-0 md:flex-row">
+        <div className="flex h-[75vh] min-w-0 flex-none flex-col overflow-hidden rounded-xl border border-line bg-ink md:h-auto md:flex-1">
           <Viewer />
         </div>
-        <aside className="flex w-[340px] flex-none flex-col gap-4 overflow-y-auto" data-testid="finding-side">
+        <aside className="flex w-full flex-none flex-col gap-4 md:w-[340px] md:overflow-y-auto" data-testid="finding-side">
           <section>
             <h2 className="mb-2 text-[13px] font-semibold">Why Fixel believes it</h2>
             <ul className="space-y-2" data-testid="chips">
