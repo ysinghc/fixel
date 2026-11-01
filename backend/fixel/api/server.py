@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from ..bench import fix_bench
 from ..bench.labelling import QUESTION, blind_items, list_runs as list_bench_runs, queue
 from ..bench.metrics import LABELS, compute as bench_metrics_of, put_label as put_bench_label
 from ..env import load_dotenv
@@ -48,6 +49,10 @@ class FixRequest(BaseModel):
 class BenchLabel(BaseModel):
     case_id: str
     label: str
+
+
+class RollRequest(BaseModel):
+    seed: int | None = Field(None, description="the case is a pure function of the seed; omitted, one is drawn and returned")
 
 
 class LabelRequest(BaseModel):
@@ -239,6 +244,74 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
             raise HTTPException(422, f"label must be one of {LABELS}")
         put_bench_label(d, req.case_id, req.label)
         return {"ok": True}
+
+    # ------------------------------------------------------------------ the fix benchmark and "roll a case"
+    fix_roots = [root / ".fixel" / "fixbench", root / "docs" / "bench" / "fix"]
+
+    def fix_run(run: str) -> Path:
+        for r in fix_roots:
+            d = (r / run).resolve()
+            if "/" not in run and run != "rolls" and (d / "meta.json").is_file() and r.resolve() in d.parents:
+                return d
+        raise HTTPException(404, "unknown fix benchmark run")
+
+    @app.get("/api/fixbench")
+    def fixbench():
+        runs = {}
+        for r in fix_roots:
+            for d in sorted(r.glob("*/meta.json")) if r.is_dir() else []:
+                m = json.loads(d.read_text())
+                runs.setdefault(m["run"], {"run": m["run"], "split": m.get("split"), "n_cases": m.get("n_cases"), "model": m.get("model"),
+                                           "mode": m.get("mode"), "created": m.get("created"), "usd": m.get("usd")})
+        listed = sorted(runs.values(), key=lambda x: x.get("created") or 0, reverse=True)
+        return {"available": bool(listed), "runs": listed,
+                "reason": None if listed else "no fix benchmark has been run yet: `fixel bench fix --split dev` writes one"}
+
+    @app.get("/api/fixbench/{run}")
+    def fixbench_metrics(run: str):
+        return fix_bench.compute(fix_run(run))
+
+    rolls: dict[str, dict] = {}
+    roll_lock = asyncio.Lock()
+
+    async def do_roll(job: dict):
+        def listen(ev: dict):
+            if ev.get("type") == "note":
+                job["log"].append({"t": "note", "text": ev["text"]})
+            elif ev.get("type") == "fix.tool":
+                job["log"].append({"t": "tool", "text": f"{ev['name']} {str(ev['args'].get('path') or ev['args'].get('summary') or '')[:80]}"})
+            elif ev.get("type") == "fix.patch" and ev.get("lint"):
+                job["log"].append({"t": "blocked", "text": "Blocked by the linter: " + "; ".join(ev["lint"])[:160]})
+            elif ev.get("type") == "fix.verify":
+                job["log"].append({"t": "verify", "text": f"verify {ev['item']}: {'ok' if ev['ok'] else 'FAILED'}"})
+        async with roll_lock:                                     # one dev server and one fixer at a time
+            job["status"] = "running"
+            try:
+                factory = (lambda model, emit: mgr.llm_factory(model, "muse-spark-1.3", emit)) if mgr.llm_factory else fix_bench.default_llm
+                job["result"] = await fix_bench.roll(job["seed"], listen, root=root / ".fixel" / "fixbench" / "rolls", llm_factory=factory)
+                job["status"] = "done"
+            except meta.CacheMiss:
+                job["status"], job["error"] = "error", "This seed was never recorded, and replay mode makes no model calls. Roll a recorded seed, or switch to live."
+            except Exception as e:
+                job["status"], job["error"] = "error", f"{type(e).__name__}: {str(e)[:200]}"
+
+    @app.post("/api/roll")
+    async def roll(req: RollRequest):
+        if not models_available():
+            raise HTTPException(409, "rolling a case needs the fix model: set MODEL_API_KEY, or use replay mode on recorded seeds")
+        import random
+        seed = req.seed if req.seed is not None else random.SystemRandom().randrange(1, 10**6)
+        job = {"id": f"roll-{seed}-{len(rolls)}", "seed": seed, "status": "queued", "log": [], "result": None, "error": None,
+               "mode": meta.mode(), "injected": True}
+        rolls[job["id"]] = job
+        app.state.roll_tasks = [t for t in getattr(app.state, "roll_tasks", []) if not t.done()] + [asyncio.create_task(do_roll(job))]
+        return job
+
+    @app.get("/api/roll/{job_id}")
+    def roll_status(job_id: str):
+        if job_id not in rolls:
+            raise HTTPException(404, "unknown roll")
+        return rolls[job_id]
 
     # ------------------------------------------------------------------ the built UI, if there is one
     dist = Path(web_dist) if web_dist else root / "web" / "dist"

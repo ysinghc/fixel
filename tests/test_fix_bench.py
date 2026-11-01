@@ -76,3 +76,45 @@ async def test_fix_bench_injects_detects_fixes_and_measures_both_arms(tmp_path, 
     assert off["status"] == "verified" and off["symptom_hiding"] == [], "the final diff is the revert, so nothing hides the symptom"
     assert m["arms"]["lint_on"]["verified"]["k"] == 1 and m["recorded_blocked_attempt"]
     assert "lint_off" in fb.render(m)
+
+
+async def test_roll_is_a_pure_function_of_the_seed_and_reports_what_it_did(tmp_path, monkeypatch):
+    seen, log = {}, []
+    real = source_mut.add_classes
+    monkeypatch.setattr(fb, "add_classes", lambda t, l, c: (seen.update(file=l.rsplit(":", 2)[0], classes=c), real(t, l, c))[1])
+    conf = cfg.load("targets/demo-shop.yaml")
+    conf.target.path = str(DEMO)
+    monkeypatch.chdir(REPO)
+    case = await fb.roll(5, log.append, confs=[conf], root=tmp_path, ops=["fixed_width"], llm_factory=lambda m, e: Reverter(seen))
+    assert case["seed"] == 5 and case["kind"] == "injected_source" and case["op"] == "fixed_width"
+    assert any(e["type"] == "note" and "Seed 5" in e["text"] for e in log) and any(e["type"] == "fix.tool" for e in log)
+    assert set(case["arms"]) == {"lint_on"}, "a roll runs the product configuration only"
+    again = await fb.roll(5, None, confs=[conf], root=tmp_path / "again", ops=["fixed_width"], llm_factory=lambda m, e: Reverter(seen))
+    assert (again["loc"], again["classes"], again["state"]) == (case["loc"], case["classes"], case["state"]), "same seed, same case"
+
+
+def test_metrics_and_render_from_saved_cases(tmp_path):
+    run = tmp_path / "r"
+    (run / "cases").mkdir(parents=True)
+    (run / "meta.json").write_text(json.dumps({"run": "r", "split": "dev", "model": "m", "mode": "record", "arms": ["lint_on", "lint_off"],
+                                               "usd": 1.5, "note": "injected"}))
+
+    def arm(status, blocked=0, hiding=(), eq=True, gone=True, new=()):
+        return {"status": status, "blocked": blocked, "usd": 0.1, "seconds": 20, "turns": 5, "symptom_hiding": list(hiding),
+                "blocked_examples": [{"lint": ["no hiding"], "diff": "+x"}] if blocked else [], "equivalent": {"identical": eq},
+                "verification": {"target_gone": gone, "new_findings": list(new), "drifted": [], "build_ok": True, "passed": status == "verified"}}
+    cases = [
+        {"id": "a", "op": "fixed_width", "detected": True, "arms": {"lint_on": arm("verified", blocked=1), "lint_off": arm("verified", hiding=["overflow"])}},
+        {"id": "b", "op": "fixed_width", "detected": True, "arms": {"lint_on": arm("failed", new=["x"]), "lint_off": arm("gave_up", gone=False)}},
+        {"id": "c", "op": "nudge", "detected": False, "arms": {}},
+    ]
+    for c in cases:
+        (run / "cases" / f"{c['id']}.json").write_text(json.dumps(c))
+    m = fb.compute(run)
+    assert m["headline"] is False and m["n_cases"] == 3 and m["n_detected"] == 2
+    on, off = m["arms"]["lint_on"], m["arms"]["lint_off"]
+    assert (on["verified"]["k"], on["verified"]["n"]) == (1, 2) and on["linter_blocks"] == 1 and on["removed_target_but_failed_the_matrix"] == 1
+    assert off["patches_that_pass_by_hiding_the_symptom"]["k"] == 1 and m["by_op"]["fixed_width"]["lint_on"] == "1/2"
+    assert m["recorded_blocked_attempt"]["case"] == "a"
+    text = fb.render(m)
+    assert "NOT A HEADLINE" in text and "PASSED BY HIDING" in text

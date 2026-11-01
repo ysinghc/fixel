@@ -176,3 +176,23 @@ export interface BenchMetrics {
   caveats: string[]
   cost: { usd: number | null; model_calls: { live: number; cached: number } | null; seconds: number | null; usd_per_case: number | null; seconds_per_case: number | null }
 }
+
+export interface FixArm {
+  n: number; verified: Rate | null; revert_equivalent: Rate | null; patches_that_pass_by_hiding_the_symptom: Rate | null
+  linter_blocks: number; cases_with_a_block: number; removed_target_but_failed_the_matrix: number; gave_up_or_failed: number
+  usd_per_fix_attempt: number | null; seconds_per_fix_attempt: number | null; turns_mean: number | null
+}
+export interface FixBenchMetrics {
+  run: string; split: string; model: string; mode: string; headline: boolean; note: string
+  n_cases: number; requested: number | null; no_applicable_element: number | null; n_detected: number; detection_of_injected_source_defects: Rate | null; usd: number
+  arms: Record<string, FixArm>; by_op: Record<string, Record<string, string | number>>
+  recorded_blocked_attempt: { case: string; lint: string[]; diff: string } | null
+}
+export interface FixBenchList { available: boolean; reason?: string | null; runs: { run: string; split: string | null; n_cases: number | null; model: string | null; mode: string | null; usd: number | null }[] }
+export interface RollJob {
+  id: string; seed: number; status: 'queued' | 'running' | 'done' | 'error'; mode: string; error: string | null
+  log: { t: 'note' | 'tool' | 'blocked' | 'verify'; text: string }[]
+  result: null | { error?: string; target?: string; op?: string; loc?: string; classes?: string; detected?: boolean; undetected_draws_skipped?: number; finding?: string; usd?: number
+    arms?: Record<string, { status: string; diff: string; summary: string; blocked: number; seconds: number; usd: number; equivalent?: { identical: boolean; states_identical: number; states: number }
+      verification: null | { target_gone: boolean; new_findings: string[]; drifted: string[]; build_ok: boolean; passed: boolean } }> }
+}

@@ -3,13 +3,14 @@ import { api } from '../api'
 import { paths } from '../paths'
 import type { BenchList, BenchMetrics, Rate } from '../types'
 import { LayerChart } from '../components/LayerChart'
+import { FixBenchResults, RollCase } from '../components/FixBench'
 import { SplitChip } from '../components/RunBits'
 import { ButtonLink, Card, Chip, Empty, PageHeader, Tabs } from '../components/ui'
 
 const LEVEL: Record<string, string> = { geometry: 'Geometry', diff: '+ Pixel diff', sam: '+ SAM 3.1', spark: '+ Spark triage' }
 const KNOWN = [['opaque_banner', 'A banner covers a button'], ['ghost_banner', 'A see-through-to-clicks banner covers a button (known gap)'],
   ['badge_overlap', 'A badge on a button: must be dismissed'], ['open_dropdown', 'An open menu: must be dismissed'], ['invisible_overlap', 'Invisible text: must be not visible']] as const
-type Tab = 'summary' | 'human' | 'known' | 'injected' | 'details'
+type Tab = 'summary' | 'human' | 'known' | 'injected' | 'fix' | 'details'
 type Measure = 'controls' | 'agreement' | 'precision' | 'recall'
 
 function Pct({ r }: { r: Rate | null | undefined }) {
@@ -70,6 +71,8 @@ export function BenchmarkPage() {
           <pre className="mt-3 rounded-lg bg-black/40 p-2 text-left text-xs text-zinc-300">fixel bench run --split dev --mutated 60 --clean 20</pre>
           <p className="mt-3 text-xs">No number is shown until it is measured.</p>
         </Empty>
+        <h2 className="mb-3 mt-8 text-sm font-semibold">Fixing</h2>
+        <div className="space-y-5"><FixBenchResults /><RollCase /></div>
       </div>
     )
   }
@@ -113,6 +116,7 @@ export function BenchmarkPage() {
             { value: 'human', label: 'Human labels', count: m.labels.n, testid: 'btab-human' },
             { value: 'known', label: 'Known answers', testid: 'btab-known' },
             { value: 'injected', label: 'Injected defects', testid: 'btab-injected' },
+            { value: 'fix', label: 'Fixing', testid: 'btab-fix' },
             { value: 'details', label: 'Cost and caveats', count: m.caveats.length, testid: 'btab-details' },
           ]} />
 
@@ -185,6 +189,8 @@ export function BenchmarkPage() {
             </div>
           )}
 
+          {tab === 'fix' && <div className="space-y-5" data-testid="fix-tab"><FixBenchResults /><RollCase /></div>}
+
           {tab === 'details' && (
             <div className="space-y-5">
               <Card title="Read these before quoting a number" testid="caveats">
@@ -196,7 +202,7 @@ export function BenchmarkPage() {
                   Model calls: {m.cost.model_calls ? `${m.cost.model_calls.live} live, ${m.cost.model_calls.cached} from the cache` : 'n/a'}. Seed {m.meta.seed}, code {m.meta.code?.commit ?? '?'}{m.meta.code?.dirty ? ' (with uncommitted changes)' : ''}.
                 </p>
               </Card>
-              <p className="text-[11px] text-muted">Not measured yet: the fix benchmark (verified-fix rate, revert-equivalence, linter blocks, regressions caught), the triage and fixer model comparisons, and the synthetic and Storybook corpora.</p>
+              <p className="text-[11px] text-muted">Not measured yet: the triage and fixer model comparisons, and the synthetic and Storybook corpora. The fix benchmark is on the Fixing tab.</p>
             </div>
           )}
         </>

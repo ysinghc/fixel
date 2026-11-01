@@ -1,4 +1,4 @@
-import type { BenchList, BenchMetrics, BenchQueue, StateDetail } from './types'
+import type { BenchList, BenchMetrics, BenchQueue, FixBenchList, FixBenchMetrics, RollJob, StateDetail } from './types'
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, init)
@@ -41,6 +41,10 @@ export const api = {
   fix: (runId: string, key: string, model?: string) => post('/api/fix', { run_id: runId, key, model }) as Promise<{ fix_id: string }>,
   label: (runId: string, key: string, label: string, note = '') => post('/api/labels', { run_id: runId, key, label, note }),
   labels: (runId: string) => j<{ key: string; label: string }[]>(`/api/labels?run_id=${runId}`),
+  fixBench: () => j<FixBenchList>('/api/fixbench'),
+  fixBenchMetrics: (run: string) => j<FixBenchMetrics>(`/api/fixbench/${encodeURIComponent(run)}`),
+  roll: (seed?: number) => j<RollJob>('/api/roll', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(seed ? { seed } : {}) }),
+  rollStatus: (id: string) => j<RollJob>(`/api/roll/${encodeURIComponent(id)}`),
   bench: () => j<BenchList>('/api/bench'),
   benchMetrics: (run: string) => j<BenchMetrics>(`/api/bench/${encodeURIComponent(run)}`),
   benchQueue: (run: string) => j<BenchQueue>(`/api/bench/${encodeURIComponent(run)}/queue`),

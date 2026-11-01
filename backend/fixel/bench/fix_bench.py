@@ -55,6 +55,7 @@ class FixBenchConfig:
     routes_per_target: int = 3
     budget_usd: float = 5.0
     max_attempts_per_case: int = 12                    # states tried before a case is abandoned as "no applicable element"
+    redraw_undetected: bool = False                    # a roll keeps drawing until the scan sees the defect, and counts the draws it skipped
     out: Path | None = None
 
 
@@ -62,6 +63,7 @@ class FixBenchConfig:
 class Tally:
     usd: float = 0.0
     budget: float = 5.0
+    listener: object = None                      # called with every event and note (the roll shows them live)
 
     @property
     def over(self) -> bool:
@@ -70,6 +72,12 @@ class Tally:
     async def emit(self, ev: dict) -> None:
         if ev.get("type") == "model.call":
             self.usd += cost.usd(ev.get("kind", ""), ev.get("model"), ev.get("usage"), ev.get("source", "live"))
+        if self.listener:
+            self.listener(ev)
+
+    def note(self, text: str, **more) -> None:
+        if self.listener:
+            self.listener({"type": "note", "text": text, **more})
 
 
 async def git(ws: Workspace, *args: str) -> str:
@@ -100,6 +108,7 @@ async def run_arm(arm: str, f: Finding, ws: Workspace, mres: list[Scanned], orig
 
     usd0, t0 = tally.usd, time.time()
     llm = llm_factory(fc.model, emit)
+    tally.note(f"Fixing with {fc.model}" + (" (linter off)" if arm == "lint_off" else ""))
     res = await fix_finding(f, ws, mres, store, emit=emit, llm=llm)
     seconds = time.time() - t0
     diff = res.diff
@@ -122,6 +131,7 @@ async def run_case(i: int, conf: cfg.Config, ws: Workspace, base_by_route: dict[
     rnd = random.Random(f"{fc.seed}:{conf.target.name}:{i}")
     op = BY_NAME[ops[i % len(ops)]]
     classes = important(SOURCE_OPS[op.name], tw_major)
+    undetected = 0
     for _ in range(fc.max_attempts_per_case):
         route = rnd.choice(list(base_by_route))
         orig = base_by_route[route]
@@ -142,10 +152,12 @@ async def run_case(i: int, conf: cfg.Config, ws: Workspace, base_by_route: dict[
         if new is None:
             continue
         used.add(f"{op.name}|{el.loc}")
+        tally.note(f"Injected {op.name} into <{el.tag}> at {el.loc}: added {classes}", op=op.name, loc=el.loc, classes=classes)
         path.write_text(new)
         await git(ws, "commit", "-aqm", f"fixbench: inject {op.name} at {el.loc}")
         try:
             states = [r.cap.state for r in orig]
+            tally.note(f"Scanning {len(states)} screens of the broken page")
             mres = await scan_baseline(ws, states, store)
             base_keys = {f.key for f in findings_of(orig) if f.status == "confirmed"}
             found = [f for f in findings_of(mres) if f.status == "confirmed" and f.key not in base_keys
@@ -154,6 +166,11 @@ async def run_case(i: int, conf: cfg.Config, ws: Workspace, base_by_route: dict[
                     "op": op.name, "classes": classes, "loc": el.loc, "tag": el.tag, "route": route, "state": res.cap.state.key,
                     "detected": bool(found), "other_new": sorted({f.key for f in findings_of(mres) if f.status == "confirmed"}
                                                                   - base_keys - {f.key for f in found})[:6], "arms": {}}
+            tally.note("Detected: " + (found[0].key if found else "the model-free scan did not find the injected defect"), detected=bool(found))
+            if not found and fc.redraw_undetected:
+                undetected += 1
+                continue                                          # the finally below restores the page; draw again
+            case["undetected_draws_skipped"] = undetected
             if found and not tally.over:
                 f = min(found, key=lambda x: len(x.widths))
                 case["finding"] = f.key
@@ -175,6 +192,41 @@ def default_llm(model: str, emit):
     return FixLLM(model, emit=emit)
 
 
+async def roll(seed: int, listener=None, split: str = "dev", model: str = "muse-wonder-1.0", budget_usd: float = 1.0,
+               llm_factory=default_llm, confs: list[cfg.Config] | None = None, root: Path = ROOT / "rolls",
+               ops: list[str] | None = None) -> dict:
+    """One case drawn from a seed: the same seed gives the same target, operator and element, so anyone can rerun it and
+    nothing is cherry-picked. Injects into the source, scans, fixes with the linter on, and returns the case (or why none)."""
+    rnd = random.Random(f"roll:{seed}")
+    pool = []
+    for c in confs or corpus.target_configs(split):
+        pkg = Path(c.target.path or ".") / "package.json"
+        if pkg.exists() and tailwind_major(json.loads(pkg.read_text())):
+            pool.append(c)
+    if not pool:
+        raise RuntimeError("no Tailwind target to inject into")
+    conf = rnd.choice(sorted(pool, key=lambda c: c.target.name))
+    op = rnd.choice(sorted(o for o in SOURCE_OPS if not ops or o in ops))
+    major = tailwind_major(json.loads((Path(conf.target.path or ".") / "package.json").read_text()))
+    fc = FixBenchConfig(split=split, n_cases=1, seed=seed, model=model, arms=("lint_on",), ops=[op], routes_per_target=2, budget_usd=budget_usd,
+                        max_attempts_per_case=40, redraw_undetected=True, out=root / f"seed-{seed}")
+    tally = Tally(budget=budget_usd, listener=listener)
+    tally.note(f"Seed {seed}: target {conf.target.name}, operator {op}", seed=seed, target=conf.target.name, op=op)
+    store = ArtifactStore()
+    async with await Workspace.open(conf.target, f"roll|{seed}") as ws:
+        head = await git(ws, "rev-parse", "HEAD")
+        base = {}
+        for route in rnd.sample(conf.routes, min(fc.routes_per_target, len(conf.routes))):
+            m = cfg.Matrix(widths=fc.widths, themes=fc.themes, text_stress=["none"], height=conf.matrix.height)
+            tally.note(f"Scanning {route} before the change")
+            base[route] = await scan_baseline(ws, matrix_states(route, m), store)
+        case = await run_case(0, conf, ws, base, major, fc, store, tally, [op], llm_factory, fc.out, head, set())
+    if case is None:
+        return {"seed": seed, "target": conf.target.name, "op": op, "error": "no element of this page could take that defect; roll another seed"}
+    case["seed"], case["usd"] = seed, round(tally.usd, 4)
+    return case
+
+
 async def run_fix_bench(fc: FixBenchConfig, say=print, llm_factory=default_llm, confs: list[cfg.Config] | None = None) -> Path:
     all_confs = confs or corpus.target_configs(fc.split)
     confs = [c for c in all_confs if not fc.targets or c.target.name in fc.targets]
@@ -187,7 +239,7 @@ async def run_fix_bench(fc: FixBenchConfig, say=print, llm_factory=default_llm, 
     store, tally, t0 = ArtifactStore(), Tally(budget=fc.budget_usd), time.time()
     say(f"fix benchmark, {fc.split} split: {len(confs)} targets, {fc.n_cases} cases, ops {', '.join(ops)}, arms {', '.join(fc.arms)}, model {fc.model}")
     per = [fc.n_cases // len(confs) + (1 if k < fc.n_cases % len(confs) else 0) for k in range(len(confs))]
-    skipped, done, failures = {}, 0, []
+    skipped, done, failures, no_element = {}, 0, [], 0
     for conf, n in zip(confs, per):
         pkg = Path(conf.target.path or ".") / "package.json"
         major = tailwind_major(json.loads(pkg.read_text())) if pkg.exists() else None
@@ -214,13 +266,14 @@ async def run_fix_bench(fc: FixBenchConfig, say=print, llm_factory=default_llm, 
                     continue
                 done += 1
                 if c is None:
+                    no_element += 1
                     say(f"    case {i}: no applicable element found")
                     continue
                 arms = " ".join(f"{a}={c['arms'][a]['status']}" for a in c["arms"]) or "NOT DETECTED"
                 say(f"    {c['id']} {c['loc']}: {arms}   spend ${tally.usd:.3f}")
     cases = [json.loads(p.read_text()) for p in sorted((out / "cases").glob("*.json"))]
     doc = {"run": run_id, "split": fc.split, "seed": fc.seed, "model": fc.model, "arms": list(fc.arms), "mode": meta.mode(),
-           "targets": [c.target.name for c in confs], "skipped_targets": skipped, "requested": fc.n_cases, "n_cases": len(cases),
+           "targets": [c.target.name for c in confs], "skipped_targets": skipped, "requested": fc.n_cases, "n_cases": len(cases), "no_applicable_element": no_element,
            "matrix": {"widths": fc.widths, "themes": fc.themes, "text_stress": ["none"]}, "n_failed": len(failures), "failed_cases": failures[:25],
            "usd": round(tally.usd, 4), "seconds": round(time.time() - t0, 1), "code": git_state(), "ops": ops, "created": time.time(),
            "note": "Every case is an injected source defect. A dev-split run is a tuning signal, not a headline number."}
@@ -236,6 +289,7 @@ def compute(run: Path) -> dict:
     detected = [c for c in cases if c["detected"]]
     m: dict = {"run": meta_doc["run"], "split": meta_doc["split"], "model": meta_doc["model"], "mode": meta_doc["mode"],
                "headline": False, "note": meta_doc["note"], "n_cases": len(cases), "n_detected": len(detected),
+               "requested": meta_doc.get("requested"), "no_applicable_element": meta_doc.get("no_applicable_element"),
                "detection_of_injected_source_defects": rate(len(detected), len(cases)), "usd": meta_doc["usd"], "arms": {}, "by_op": {}}
     for arm in meta_doc["arms"]:
         rs = [c["arms"][arm] for c in detected if arm in c["arms"] and c["arms"][arm]["status"] != "budget"]
@@ -250,7 +304,8 @@ def compute(run: Path) -> dict:
             "linter_blocks": sum(r["blocked"] for r in rs), "cases_with_a_block": sum(1 for r in rs if r["blocked"]),
             "removed_target_but_failed_the_matrix": len(removed_but_failed),
             "gave_up_or_failed": sum(1 for r in rs if r["status"] in ("gave_up", "failed")),
-            "usd_per_fix_attempt": round(sum(r["usd"] for r in rs) / len(rs), 4) if rs else None,
+            # later arms replay the first arm's cached turns until the two diverge, so their cost is not a measurement
+            "usd_per_fix_attempt": round(sum(r["usd"] for r in rs) / len(rs), 4) if rs and arm == meta_doc["arms"][0] else None,
             "seconds_per_fix_attempt": round(sum(r["seconds"] for r in rs) / len(rs), 1) if rs else None,
             "turns_mean": round(sum(r["turns"] for r in rs) / len(rs), 1) if rs else None}
     for op in sorted({c["op"] for c in cases}):
@@ -276,7 +331,8 @@ def pct(r: dict | None) -> str:
 def render(m: dict) -> str:
     L = [f"Fix benchmark {m['run']}  split={m['split']}  model={m['model']}  mode={m['mode']}",
          "NOT A HEADLINE: " + m["note"] if not m["headline"] else "", "",
-         f"Injected source defects: {m['n_cases']} cases, {m['n_detected']} found by the model-free scan "
+         f"Injected source defects: {m['n_cases']} cases ({m['requested']} requested; {m['no_applicable_element']} draws found no element the operator could edit), "
+         f"{m['n_detected']} found by the model-free scan "
          f"({pct(m['detection_of_injected_source_defects'])}); only those were handed to the fixer. Spend ${m['usd']:.2f}."]
     for arm, a in m["arms"].items():
         L += ["", f"[{arm}]  {a['n']} fix attempts",
@@ -285,7 +341,8 @@ def render(m: dict) -> str:
               f"  linter blocks            {a['linter_blocks']} edits blocked in {a['cases_with_a_block']} cases",
               f"  removed target, failed   {a['removed_target_but_failed_the_matrix']} patches removed the target but failed the matrix (regressions caught)",
               f"  failed / gave up         {a['gave_up_or_failed']}",
-              f"  cost / latency           ${a['usd_per_fix_attempt']} and {a['seconds_per_fix_attempt']}s per attempt, {a['turns_mean']} turns"]
+              f"  cost / latency           {'$' + str(a['usd_per_fix_attempt']) if a['usd_per_fix_attempt'] is not None else 'cost not measured (replays the first arm\'s cache)'}"
+              f" and {a['seconds_per_fix_attempt']}s per attempt, {a['turns_mean']} turns"]
         if a["patches_that_pass_by_hiding_the_symptom"]:
             L.append(f"  PASSED BY HIDING         {pct(a['patches_that_pass_by_hiding_the_symptom'])} of its verified patches would be blocked by the linter")
     L += ["", "By operator (detected/cases, then verified/attempted per arm):"]

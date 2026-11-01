@@ -312,3 +312,24 @@ def test_a_non_confirmed_finding_cannot_be_fixed(tmp_path):
         db.put_findings(rid, [{**f, "status": "dismissed"}])
         r = live.http.post("/api/fix", json={"run_id": rid, "key": f["key"]})
         assert r.status_code == 409 and "only confirmed" in r.json()["detail"]
+
+
+def test_fix_benchmark_listing_reads_saved_runs_and_roll_refuses_without_a_model(tmp_path, monkeypatch):
+    root = write_root(tmp_path)
+    assert create_app(root, db_path=tmp_path / "a.db", store_root=tmp_path / "art")                       # builds with no runs at all
+    run = root / "docs" / "bench" / "fix" / "r1"
+    (run / "cases").mkdir(parents=True)
+    (run / "meta.json").write_text(json.dumps({"run": "r1", "split": "dev", "model": "m", "mode": "record", "arms": ["lint_on"], "usd": 0.5,
+                                               "note": "injected", "n_cases": 1, "created": 1}))
+    (run / "cases" / "c.json").write_text(json.dumps({"id": "c", "op": "nudge", "detected": False, "arms": {}}))
+    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("META_MODEL_API", raising=False)
+    monkeypatch.setenv("FIXEL_MODE", "record")
+    with Live(create_app(root, db_path=tmp_path / "fixel.db", store_root=tmp_path / "art")) as lv:
+        listed = lv.http.get("/api/fixbench").json()
+        assert listed["available"] and listed["runs"][0]["run"] == "r1"
+        m = lv.http.get("/api/fixbench/r1").json()
+        assert m["headline"] is False and m["n_detected"] == 0
+        assert lv.http.get("/api/fixbench/nope").status_code == 404 and lv.http.get("/api/fixbench/rolls").status_code == 404
+        assert lv.http.post("/api/roll", json={}).status_code == 409                                      # no key, not replay
+        assert lv.http.get("/api/roll/unknown").status_code == 404
