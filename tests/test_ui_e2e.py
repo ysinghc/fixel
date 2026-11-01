@@ -65,11 +65,11 @@ def shot(page, name):
         page.screenshot(path=str(SHOTS / f"{name}.png"))
 
 
-def card_for(page, loc_fragment):
-    return page.locator('[data-testid=finding-card]').filter(has=page.locator('code', has_text=loc_fragment)).first
+def row_for(page, loc_fragment):
+    return page.locator('[data-testid=finding-row]').filter(has=page.locator('code', has_text=loc_fragment)).first
 
 
-def test_scan_inspect_fix_and_refuse_a_bad_fix_in_the_browser(server):
+def test_scan_inspect_fix_and_refuse_a_bad_fix_across_pages(server):
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=os.environ.get("FIXEL_CHROMIUM_PATH") or None)
         page = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -77,104 +77,135 @@ def test_scan_inspect_fix_and_refuse_a_bad_fix_in_the_browser(server):
         page.on("pageerror", lambda e: problems.append(f"pageerror: {e}"))
         page.on("console", lambda m: m.type == "error" and problems.append(f"console: {m.text} {m.location.get('url', '')}"))
 
+        # ----------------------------------------------------------------- home: nothing yet, three jobs one click away
         page.goto(server.url)
-        expect(page.get_by_test_id("empty")).to_contain_text("No scan yet")
-        expect(page.get_by_test_id("target-select")).to_have_value(re.compile("demo.yaml"))
+        expect(page.get_by_test_id("no-scans")).to_contain_text("No scans yet")
         expect(page.get_by_test_id("mode")).to_be_visible()
-        shot(page, "01-empty")
+        shot(page, "01-home-empty")
 
-        # ----------------------------------------------------------------- scan
-        page.get_by_test_id("models-toggle").uncheck()                       # no API spend in a test
+        # ----------------------------------------------------------------- scan setup: three steps, one button
+        page.get_by_test_id("action-scan").click()
+        expect(page).to_have_url(re.compile(r"/scan$"))
+        expect(page.get_by_test_id("target-demo-shop")).to_have_attribute("data-on", "true")   # the demo app is pre-selected
+        expect(page.get_by_test_id("state-count")).to_have_text("6")                           # 3 widths x 2 themes x 1 text setting
+        page.get_by_test_id("evidence-quick").click()                                          # no API spend in a test
+        shot(page, "02-scan-setup")
         page.get_by_test_id("scan-button").click()
-        expect(page.get_by_test_id("count-confirmed")).to_have_text("3", timeout=120_000)
-        for w in (320, 375, 1024):
-            expect(page.get_by_test_id(f"width-{w}")).to_be_enabled()
-        shot(page, "02-scanned")
-        expect(page.get_by_test_id("width-count-320")).to_have_text("3")        # card + chips + cookie banner at a phone width
-        expect(page.get_by_test_id("width-count-1024")).to_have_text("1")       # only the banner still covers the button on desktop
 
-        # ----------------------------------------------------------------- inspect a finding
-        card = card_for(page, "PriceCard.jsx")
-        card.click()
-        expect(card).to_have_attribute("data-selected", "true")
-        expect(page.locator('[data-testid=finding-box][data-active=true]')).to_have_count(1)
-        expect(page.get_by_test_id("scrubber-fail")).to_be_visible()             # failing range shaded on the scrubber
-        expect(card.get_by_test_id("chips")).to_contain_text("Geometry: overflows by")
-        expect(card.get_by_test_id("chips")).to_contain_text("Pixels:")
-        expect(card.get_by_test_id("chips")).to_contain_text("Spark unavailable — geometry and pixels only")
-        expect(card.locator("code")).to_have_text("PriceCard.jsx:4")
-        page.get_by_test_id("tile").hover()
-        page.keyboard.press("1")                                                  # DOM boxes layer
-        expect(page.get_by_test_id("layer-dom")).to_have_attribute("data-on", "true")
-        expect(page.get_by_test_id("overlay").locator("rect")).not_to_have_count(0)
-        shot(page, "03-selected-with-dom-layer")
-        page.keyboard.press("1")
-        page.keyboard.press("k")                                                  # previous finding (the card is last in the list)
-        expect(card).to_have_attribute("data-selected", "false")
-        page.keyboard.press("j")
-        expect(card).to_have_attribute("data-selected", "true")
+        # ----------------------------------------------------------------- the run page: progress, then findings
+        expect(page).to_have_url(re.compile(r"/runs/[0-9a-f]+$"))
+        run_url = page.url
+        expect(page.get_by_test_id("count-confirmed")).to_have_text("3", timeout=120_000)
+        expect(page.get_by_test_id("run-status")).to_have_text("Done", timeout=60_000)
+        expect(page.get_by_test_id("finding-row")).to_have_count(3)
+        shot(page, "03-run-findings")
+
+        # every screen as a grid; counts per screen
+        page.get_by_test_id("subnav-screens").click()
+        expect(page.get_by_test_id("screen-320-light-none")).to_have_attribute("data-count", "3")  # card, chips, cookie banner
+        expect(page.get_by_test_id("screen-1024-light-none")).to_have_attribute("data-count", "1")  # only the banner on desktop
+        page.wait_for_function("() => [...document.querySelectorAll('[data-testid^=screen-] img')].every(i => i.complete && i.naturalWidth > 0)")
+        shot(page, "04-screens")
+        page.get_by_test_id("screen-320-light-none").click()
+        expect(page.get_by_test_id("screen-finding")).to_have_count(3)
+        expect(page.get_by_test_id("tile")).to_be_visible()
+        page.get_by_test_id("back").click()
+        page.get_by_test_id("subnav-findings").click()
 
         # statuses that are not "confirmed" are shown, not hidden
         page.get_by_test_id("tab-not_observable").click()
-        expect(page.get_by_test_id("findings")).to_be_visible()
+        expect(page.get_by_test_id("status-help")).to_contain_text("nothing visible changes")
         page.get_by_test_id("tab-confirmed").click()
 
-        # ----------------------------------------------------------------- fix #1: blocked edit, then a verified fix
-        card.get_by_test_id("fix-button").click()
-        drawer = page.get_by_test_id("drawer")
-        expect(drawer).to_be_visible(timeout=30_000)
+        # ----------------------------------------------------------------- one finding, on its own page
+        row_for(page, "PriceCard.jsx").click()
+        expect(page.get_by_test_id("finding-title")).to_have_text("Runs off the screen")
+        key = page.get_by_test_id("finding-page").get_attribute("data-key")
+        chips = page.get_by_test_id("chips")
+        expect(chips).to_contain_text("overflows by")
+        expect(chips).to_contain_text("Pixels")
+        expect(chips).to_contain_text("Spark unavailable — geometry and pixels only")
+        expect(page.locator('[data-testid=finding-box][data-active=true]')).to_have_count(1)
+        expect(page.get_by_test_id("scrubber-fail")).to_be_visible()                  # failing range shaded on the scrubber
+        page.get_by_test_id("tile").hover()
+        page.keyboard.press("1")                                                      # all page elements layer
+        page.get_by_test_id("layers-button").click()
+        expect(page.get_by_test_id("layer-dom")).to_have_attribute("data-on", "true")
+        expect(page.get_by_test_id("overlay").locator("rect")).not_to_have_count(0)
+        page.get_by_test_id("layer-dom").click()                                      # and off again, by mouse
+        page.get_by_test_id("finding-title").click()                                  # closes the menu
+        shot(page, "05-finding")
+        page.keyboard.press("k")                                                      # previous finding has its own URL
+        expect(page.get_by_test_id("finding-page")).not_to_have_attribute("data-key", key)
+        page.keyboard.press("j")
+        expect(page.get_by_test_id("finding-page")).to_have_attribute("data-key", key)
+
+        # ----------------------------------------------------------------- fix #1: blocked edit, then a verified fix, on its own page
+        page.get_by_test_id("fix-button").click()
+        expect(page).to_have_url(re.compile(r"/fixes/[0-9a-f]+$"))
         expect(page.get_by_test_id("fix-status")).to_have_text("verified", timeout=240_000)
         expect(page.get_by_test_id("fix-model")).to_have_text("Wonder")
-        names = page.locator('[data-testid=timeline-row]').evaluate_all("els => els.map(e => e.dataset.name + ':' + e.dataset.status)")
-        assert names[:4] == ["edit_file:blocked", "edit_file:ok", "rerender:ok", "finish:ok"], names
-        expect(drawer.get_by_test_id("lint-reasons")).to_have_count(0)            # shown only on the blocked tab
-        tabs = page.get_by_test_id("diff-tab")
-        expect(tabs).to_have_count(3)                                             # blocked edit, good edit, final patch
-        assert tabs.nth(0).get_attribute("data-blocked") == "true" and tabs.nth(1).get_attribute("data-blocked") == "false"
-        tabs.nth(0).click()
-        expect(drawer.get_by_test_id("lint-reasons")).to_contain_text("hides or clips")
-        expect(drawer.get_by_test_id("diff")).to_contain_text("overflow-hidden")
-        shot(page, "04-blocked-edit")
-        tabs.nth(2).click()
-        expect(drawer.get_by_test_id("diff")).to_contain_text("max-w-full")
-        expect(drawer.get_by_test_id("diff").locator('[data-kind=add]')).to_have_count(1)
-        # proof: every checklist item, every grid cell, a before/after slider, and an enabled export
-        expect(drawer.locator('[data-testid=check][data-state=ok]')).to_have_count(5)
-        cells = drawer.get_by_test_id("grid-cell")
+        expect(page.get_by_test_id("verdict")).to_have_attribute("data-ok", "true")
+        expect(page.locator('[data-testid=step][data-state=done]')).to_have_count(4)
+        proof = page.get_by_test_id("proof")                                          # the proof tab opens by itself at the end
+        expect(proof.locator('[data-testid=check][data-state=ok]')).to_have_count(5)
+        cells = proof.get_by_test_id("grid-cell")
         assert cells.count() == 6 and cells.evaluate_all("els => els.every(e => e.dataset.state === 'ok')")
-        expect(drawer.get_by_test_id("before-after")).to_be_visible()
-        export = drawer.get_by_test_id("export")
-        expect(export).to_be_visible()
-        href = export.get_attribute("href")
+        expect(proof.get_by_test_id("before-after")).to_be_visible()
+        href = page.get_by_test_id("export").get_attribute("href")
         body = page.request.get(server.url + href)
         assert body.status == 200 and "max-w-full" in body.text() and "overflow-hidden" not in body.text()
-        shot(page, "05-fix-verified")
-        expect(card).to_contain_text("Fixed ✓")
+        shot(page, "06-fix-verified")
+
+        page.get_by_test_id("tab-changes").click()
+        tabs = page.get_by_test_id("diff-tab")
+        expect(tabs).to_have_count(3)                                                 # blocked edit, good edit, final patch
+        assert tabs.nth(0).get_attribute("data-blocked") == "true" and tabs.nth(1).get_attribute("data-blocked") == "false"
+        tabs.nth(0).click()
+        expect(page.get_by_test_id("lint-reasons")).to_contain_text("hides or clips")
+        expect(page.get_by_test_id("diff")).to_contain_text("overflow-hidden")
+        shot(page, "07-fix-blocked-edit")
+        tabs.nth(2).click()
+        expect(page.get_by_test_id("diff").locator('[data-kind=add]')).to_have_count(1)
+
+        page.get_by_test_id("tab-log").click()
+        names = page.locator('[data-testid=timeline-row]').evaluate_all("els => els.map(e => e.dataset.name + ':' + e.dataset.status)")
+        assert names[:4] == ["edit_file:blocked", "edit_file:ok", "rerender:ok", "finish:ok"], names
+
+        page.get_by_test_id("back").click()
+        expect(page.get_by_test_id("view-fix")).to_contain_text("Fixed ✓")
 
         # ----------------------------------------------------------------- fix #2: a bad fix must not be called fixed
-        card2 = card_for(page, "Perks.jsx")
-        card2.click()
-        card2.get_by_test_id("fix-button").click()
+        page.goto(run_url)
+        expect(row_for(page, "PriceCard.jsx")).to_contain_text("Fixed ✓")
+        row_for(page, "Perks.jsx").click()
+        page.get_by_test_id("fix-button").click()
         expect(page.get_by_test_id("fix-status")).to_have_text("not verified", timeout=240_000)
-        expect(drawer.get_by_test_id("not-verified")).to_be_visible()
-        expect(drawer.get_by_test_id("export")).to_be_disabled()
-        expect(drawer.locator('[data-testid=check][data-check=target_gone][data-state=fail]')).to_have_count(1)
-        expect(drawer.locator('[data-testid=grid-cell][data-state=fail]').first).to_be_visible()
-        shot(page, "06-fix-not-verified")
-        page.keyboard.press("Escape")
-        expect(drawer).to_have_count(0)
+        expect(page.get_by_test_id("not-verified")).to_be_visible()
+        expect(page.get_by_test_id("export")).to_be_disabled()
+        expect(page.locator('[data-testid=check][data-check=target_gone][data-state=fail]')).to_have_count(1)
+        expect(page.locator('[data-testid=grid-cell][data-state=fail]').first).to_be_visible()
+        shot(page, "08-fix-not-verified")
 
-        # ----------------------------------------------------------------- the screen is a function of the event log
+        # ----------------------------------------------------------------- every page is a URL rebuilt from the event log
         page.reload()
+        expect(page.get_by_test_id("fix-status")).to_have_text("not verified", timeout=60_000)
+        page.goto(run_url)
         expect(page.get_by_test_id("count-confirmed")).to_have_text("3", timeout=60_000)
-        expect(page.get_by_test_id("width-count-320")).to_be_visible()
-        expect(card_for(page, "PriceCard.jsx")).to_contain_text("Fixed ✓")        # the fix was rebuilt from the same stream
-        shot(page, "07-after-reload")
 
-        # ----------------------------------------------------------------- the benchmark tab is honest
-        page.get_by_test_id("tab-bench").click()
-        expect(page.get_by_test_id("bench")).to_contain_text("Not available yet")
-        page.get_by_test_id("tab-scan").click()
+        # ----------------------------------------------------------------- home now lists the unfinished work
+        page.get_by_test_id("nav-home").click()
+        expect(page.get_by_test_id("todo-findings")).to_contain_text("2 confirmed findings not fixed yet")
+        expect(page.get_by_test_id("recent-run")).to_have_count(1)
+        shot(page, "09-home")
+        page.get_by_test_id("nav-runs").click()
+        expect(page.get_by_test_id("run-row")).to_have_count(1)
+
+        # ----------------------------------------------------------------- the benchmark page is honest
+        page.get_by_test_id("nav-benchmark").click()
+        expect(page.get_by_test_id("bench-none")).to_contain_text("no benchmark has been run yet")
+        page.goto(server.url + "/no/such/page")
+        expect(page.get_by_text("There is no page here")).to_be_visible()
 
         assert problems == [], problems
         browser.close()

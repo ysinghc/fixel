@@ -2,8 +2,9 @@
 
 The opacity diff hides one element and counts how many pixels change inside a region. It is model-free,
 so the verifier can use it. Extensions beyond the guide's snippet:
-  * a collision is observable only when *both* elements paint in the overlap (each is probed with the other hidden), so a
-    visible line overlapped by invisible text is not a collision, whichever of the two is on top;
+  * a collision is observable only when *both* elements paint in the overlap, each probed with the other hidden together
+    with the other's own containers (its ancestors up to the shared one): a visible line overlapped by invisible text is not
+    a collision, but a heading covered by a box's background is, even when the box is the other element's parent;
   * element protrusion measures paint in the part of the child outside its parent, since there is no overlap.
 """
 import io
@@ -16,7 +17,7 @@ from ..meta.sam import clamp_box, iou_and_spill, segment_boxes
 from ..models import Candidate, Capture, Element, PixelEvidence
 from ..store import ArtifactStore
 from .fuse import observable
-from .oracles import box, inter
+from .oracles import ancestors, box, inter
 
 HIDE_JS = ("([s, hide]) => { const e = document.querySelector(s); if (!e) return null; const p = e.style.opacity;"
            " if (hide) { e.style.setProperty('opacity', '0', 'important'); return p; }"
@@ -63,17 +64,26 @@ async def hidden_diff(page, scroll_y: int, hide_id: int, rects: list[tuple]) -> 
     return float(changed[mask].mean())
 
 
-async def paints_alone(page, scroll_y: int, hide_id: int, probe_id: int, rects: list[tuple]) -> float:
-    """Share of pixels in `rects` that change when `probe_id` is hidden while `hide_id` is already hidden:
-    does the probe paint there on its own?"""
-    sel = f'[data-fixel-id="{hide_id}"]'
-    prev = await page.evaluate(HIDE_JS, [sel, True])
-    if prev is None:
-        return 0.0
+async def paints_alone(page, scroll_y: int, hide_ids: list[int], probe_id: int, rects: list[tuple]) -> float:
+    """Share of pixels in `rects` that change when `probe_id` is hidden while every element in `hide_ids` is already
+    hidden: does the probe paint there on its own?"""
+    hidden: list[tuple[str, str]] = []
     try:
+        for i in hide_ids:
+            sel = f'[data-fixel-id="{i}"]'
+            prev = await page.evaluate(HIDE_JS, [sel, True])
+            if prev is not None:
+                hidden.append((sel, prev))
         return await hidden_diff(page, scroll_y, probe_id, rects)
     finally:
-        await page.evaluate(RESTORE_JS, [sel, prev])
+        for sel, prev in reversed(hidden):
+            await page.evaluate(RESTORE_JS, [sel, prev])
+
+
+def own_chain(e: Element, other: Element, by_id: dict[int, Element]) -> list[int]:
+    """The element and its ancestors that are not also the other element's ancestors: what paints "as part of" it."""
+    shared = set(ancestors(other, by_id))
+    return [e.id] + [a for a in ancestors(e, by_id) if a not in shared and a != other.id]
 
 
 async def opacity_diff(page, scroll_y: int, a: Element, b: Element, full_boxes: bool = False) -> float:
@@ -96,7 +106,8 @@ async def pixel_evidence(page, cap: Capture, c: Candidate) -> PixelEvidence:
         a, b = els
         r = inter(box(a), box(b))
         rects = [r] if r[2] > r[0] and r[3] > r[1] else []
-        diff = min(await paints_alone(page, tile.scroll_y, a.id, b.id, rects), await paints_alone(page, tile.scroll_y, b.id, a.id, rects))
+        diff = min(await paints_alone(page, tile.scroll_y, own_chain(a, b, by_id), b.id, rects),
+                   await paints_alone(page, tile.scroll_y, own_chain(b, a, by_id), a.id, rects))
     elif c.type == "occlusion" and len(els) == 2:
         diff = await opacity_diff(page, tile.scroll_y, els[0], els[1], full_boxes=True)   # els[1] covers
     elif c.type == "element_protrusion" and len(els) == 2:

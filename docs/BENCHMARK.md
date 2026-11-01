@@ -99,7 +99,15 @@ Next.js app with five routes, which is a weaker claim about generalization than 
 An earlier attempt also aborted on a crashing case (fixed: restore is null-safe, cases are guarded and counted). Neither aborted
 attempt's results were read.
 
-Nothing about detection was changed after this run started, and nothing should be: this run is the test split, so changing detection
+**One detection fix landed after this run, and its detection numbers must be regenerated before they are quoted.** The collision
+rule introduced on the development split (both elements must paint in the overlap) had a bug that a pre-existing unit test
+(`test_verify`) caught after the run: a heading covered by the *parent box* of the other text read as unpainted, so a covered heading
+was "not visible". It is fixed (each element is probed with the other one's containers hidden). The fix came from a failing unit test,
+not from looking at test-split results, but the run's stored detection levels were computed with the buggy rule. The screenshots and
+the labelling queue do not depend on detection, so labels made on the bundle stay valid; the detection side should be rerun with the
+same seed (`fixel bench run --split test --targets e-broker --mutated 150 --clean 50 --seed 7`) before computing the headline.
+
+Apart from that fix, nothing about detection was changed after this run started, and nothing should be: this run is the test split, so changing detection
 code after seeing its numbers makes them no longer clean (use a new seed and fresh labels if that happens).
 
 ## Known gaps the benchmark has found (development split)

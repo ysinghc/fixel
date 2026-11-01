@@ -172,7 +172,6 @@ export interface Layers { dom: boolean; sam: boolean; candidates: boolean; findi
 export type ChipHover = 'geometry' | 'pixels' | 'spark' | null
 
 interface Ui {
-  view: 'scan' | 'label' | 'bench'
   runId: string | null
   stateKey: string | null
   tile: number
@@ -184,15 +183,10 @@ interface Ui {
   hoverChip: ChipHover
   layers: Layers
   tab: Status
-  drawer: boolean
-  fixId: string | null
   details: Record<string, StateDetail>
   labels: Record<string, string>
   targets: Target[]
   appConfig: AppConfig | null
-  pickConfig: string
-  pickRoute: string
-  useModels: boolean
 }
 
 interface Store extends Data, Ui {
@@ -206,9 +200,9 @@ interface Store extends Data, Ui {
 }
 
 const baseUi = (): Ui => ({
-  view: 'scan', runId: null, stateKey: null, tile: 0, route: null, theme: 'light', stress: 'none', findingKey: null,
+  runId: null, stateKey: null, tile: 0, route: null, theme: 'light', stress: 'none', findingKey: null,
   hoverKey: null, hoverChip: null, layers: { dom: false, sam: true, candidates: false, findings: true }, tab: 'confirmed',
-  drawer: false, fixId: null, details: {}, labels: {}, targets: [], appConfig: null, pickConfig: '', pickRoute: '', useModels: true,
+  details: {}, labels: {}, targets: [], appConfig: null,
 })
 
 export const stateKeyFor = (states: Record<string, StateInfo>, route: string | null, width: number, theme: string, stress: string) =>
@@ -227,17 +221,14 @@ export const useStore = create<Store>((set, get) => ({
     if (ev.type === 'state.captured' && !s.stateKey) {
       patch.stateKey = ev.state_key; patch.tile = 0; patch.route = ev.route; patch.theme = ev.theme; patch.stress = ev.text_stress
     }
-    if (ev.type === 'run.started') Object.assign(patch, { ...baseUi(), view: s.view, runId: s.runId, labels: s.labels, targets: s.targets, appConfig: s.appConfig, pickConfig: s.pickConfig, pickRoute: s.pickRoute, useModels: s.useModels })
-    if (ev.type === 'fix.started') { patch.drawer = true; patch.fixId = ev.fix_id }
+    if (ev.type === 'run.started') Object.assign(patch, { ...baseUi(), runId: s.runId, findingKey: s.findingKey, labels: s.labels, targets: s.targets, appConfig: s.appConfig })
     set(patch)
     if (ev.type === 'state.done' && get().stateKey === ev.state_key) void get().loadDetail(ev.state_key)
-    if (ev.type === 'finding.updated' && !get().findingKey) {
-      const top = Object.values(get().findings).find(f => f.status === 'confirmed')
-      if (top) get().selectFinding(top.key)
-    }
+    // a page that asked for a finding before its events arrived gets it as soon as they do
+    if (ev.type === 'finding.updated' && get().findingKey === ev.finding.key && !get().stateKey) get().selectFinding(ev.finding.key)
   },
 
-  reset: runId => set(s => ({ ...emptyData(), ...baseUi(), runId, labels: {}, targets: s.targets, appConfig: s.appConfig, pickConfig: s.pickConfig, pickRoute: s.pickRoute, useModels: s.useModels })),
+  reset: runId => set(s => ({ ...emptyData(), ...baseUi(), runId, labels: {}, targets: s.targets, appConfig: s.appConfig })),
   set: p => set(p),
 
   selectState: (key, tile = 0) => {
@@ -251,7 +242,7 @@ export const useStore = create<Store>((set, get) => ({
     if (!key) { set({ findingKey: null }); return }
     const { findings, states, theme, stress } = get()
     const f = findings[key]
-    if (!f) return
+    if (!f) { set({ findingKey: key }); return }                          // not streamed in yet: applyEvent finishes the job
     // jump to the narrowest-width state where it reproduces, in the current theme and text-stress if possible
     const cands = [...f.candidates].sort((a, b) => (states[a.state_key]?.width ?? 1e9) - (states[b.state_key]?.width ?? 1e9))
     const pref = cands.find(c => states[c.state_key]?.theme === theme && states[c.state_key]?.text_stress === stress) ?? cands[0]

@@ -53,6 +53,15 @@ def test_visible_text_overlapped_by_invisible_text_is_not_observable(evidence):
     assert results and all(not px.observable for _, px in results)
 
 
+def test_text_covered_by_the_other_texts_box_is_observable(evidence):
+    # regression: the paragraph's *parent* paints the background that covers the heading; probing the paragraph alone
+    # (without its box) made the heading look unpainted, so a covered heading was called "not visible"
+    html = RESET + ('<h1 style="margin:0;font-size:32px">Welcome</h1>'
+                    '<div style="background:#fde;padding:12px;margin-top:-30px;position:relative"><p style="margin:0">Free shipping this week</p></div>')
+    results = evidence(html, "collision")
+    assert results and all(px.observable for _, px in results)
+
+
 def test_banner_over_button_is_observable(evidence):
     html = RESET + ('<div style="height:480px"></div><button style="width:140px;height:44px">Checkout</button>'
                     '<div style="position:fixed;left:0;right:0;bottom:0;height:120px;background:#333;z-index:50"></div>')

@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { widthRange } from '../fmt'
 import { stateKeyFor, useStore, type Layers } from '../store'
 import type { CandidateInfo, ElementBox, Finding, Status } from '../types'
+import { Kbd } from './ui'
 
 const STATUS_COLOR: Record<Status, string> = { confirmed: '#ef4444', needs_review: '#f59e0b', dismissed: '#64748b', not_observable: '#475569' }
 const A = '#ef4444', B = '#3b82f6'
@@ -93,26 +94,47 @@ function Overlay() {
   )
 }
 
-function LayerChips() {
+const LAYERS: { key: keyof Layers; label: string; swatch: string; hint: string; help: string }[] = [
+  { key: 'findings', label: 'Findings', swatch: '#ef4444', hint: '4', help: 'Outlines of findings; the selected one is filled' },
+  { key: 'sam', label: 'SAM bounds', swatch: '#14b8a6', hint: '2', help: 'What SAM 3.1 says is painted inside each box' },
+  { key: 'candidates', label: 'Geometry candidates', swatch: '#fbbf24', hint: '3', help: 'Every box the geometry checks flagged, before the pixels' },
+  { key: 'dom', label: 'All page elements', swatch: '#a1a1aa', hint: '1', help: 'Every element box from the page snapshot' },
+]
+
+/** The overlay layers live behind one button: most people only need the finding outline (cognitive load). */
+export function LayerMenu() {
   const layers = useStore(s => s.layers)
   const toggle = useStore(s => s.toggleLayer)
-  const items: { key: keyof Layers; label: string; swatch: string; hint: string }[] = [
-    { key: 'dom', label: 'DOM boxes', swatch: '#a1a1aa', hint: '1' },
-    { key: 'sam', label: 'SAM bounds', swatch: '#14b8a6', hint: '2' },
-    { key: 'candidates', label: 'Candidates', swatch: '#fbbf24', hint: '3' },
-    { key: 'findings', label: 'Findings', swatch: '#ef4444', hint: '4' },
-  ]
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [])
+  const on = LAYERS.filter(l => layers[l.key]).length
   return (
-    <div className="flex items-center gap-1.5" data-testid="layers">
-      {items.map(i => (
-        <button key={i.key} onClick={() => toggle(i.key)} data-testid={`layer-${i.key}`} data-on={layers[i.key]}
-          title={`Toggle with ${i.hint}`}
-          className={`flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] transition-colors ${layers[i.key] ? 'border-white/25 bg-white/10 text-white' : 'border-line text-muted hover:text-zinc-300'}`}>
-          <span className="h-2 w-2 rounded-sm" style={{ background: layers[i.key] ? i.swatch : 'transparent', border: `1px solid ${i.swatch}` }} />
-          {i.label}
-          <kbd className="text-[9px] text-zinc-500">{i.hint}</kbd>
-        </button>
-      ))}
+    <div className="relative" ref={ref} data-testid="layers">
+      <button onClick={() => setOpen(o => !o)} data-testid="layers-button" aria-expanded={open}
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-raised px-2.5 py-1 text-xs text-zinc-300 hover:border-zinc-500">
+        Layers <span className="tabular-nums text-muted">{on}</span> <span className="text-muted">▾</span>
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-line bg-panel p-1.5 shadow-2xl shadow-black/60" role="menu">
+          {LAYERS.map(l => (
+            <button key={l.key} onClick={() => toggle(l.key)} data-testid={`layer-${l.key}`} data-on={layers[l.key]} role="menuitemcheckbox" aria-checked={layers[l.key]}
+              className="flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left hover:bg-white/5">
+              <span className="mt-0.5 grid h-4 w-4 flex-none place-items-center rounded border" style={{ borderColor: l.swatch, background: layers[l.key] ? l.swatch : 'transparent' }}>
+                {layers[l.key] && <span className="text-[10px] font-bold text-black">✓</span>}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center text-xs font-medium text-zinc-200">{l.label}<span className="ml-auto"><Kbd>{l.hint}</Kbd></span></span>
+                <span className="block text-[11px] text-muted">{l.help}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -161,114 +183,49 @@ function WidthScrubber() {
   )
 }
 
-function EmptyState() {
-  const run = useStore(s => s.run)
-  const targets = useStore(s => s.targets)
-  const pick = useStore(s => s.pickConfig)
-  const route = useStore(s => s.pickRoute)
-  const appConfig = useStore(s => s.appConfig)
-  const t = targets.find(x => x.config === pick)
-  const routes = route === '*' ? t?.routes.length ?? 1 : 1
-  const n = t ? routes * t.widths.length * t.themes.length * t.text_stress.length : 0
-
-  if (run) {
-    return (
-      <div className="grid h-full place-items-center p-8 text-center" data-testid="empty">
-        <div className="space-y-3">
-          <div className="skeleton mx-auto h-12 w-12 rounded-xl" />
-          <h2 className="text-base font-semibold">Rendering the first state…</h2>
-          <p className="max-w-sm text-sm text-muted">Rendering {run.states} states of {run.target}. Screenshots appear as they are captured.</p>
-        </div>
-      </div>
-    )
-  }
-  return (
-    <div className="grid h-full place-items-center p-8" data-testid="empty">
-      <div className="w-full max-w-lg space-y-5 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-sky-500/15 text-xl text-sky-300">◫</div>
-        <div>
-          <h2 className="text-base font-semibold">No scan yet</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
-            Fixel renders each route across a matrix of viewport widths, themes and text lengths, finds layout failures,
-            and checks every one against the actual pixels.
-          </p>
-        </div>
-        {t && (
-          <div className="rounded-xl border border-line bg-panel p-4 text-left" data-testid="summary">
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-medium">{t.name}</span>
-              <span className="text-xs text-muted">{t.split ? `${t.split} split` : ''}</span>
-            </div>
-            <dl className="mt-3 space-y-2 text-xs">
-              <div className="flex gap-3"><dt className="w-14 flex-none text-muted">routes</dt><dd className="text-zinc-300">{route === '*' ? t.routes.join(', ') : route}</dd></div>
-              <div className="flex gap-3"><dt className="w-14 flex-none text-muted">widths</dt><dd className="flex flex-wrap gap-1">{t.widths.map(w => <span key={w} className="rounded bg-raised px-1.5 py-0.5 tabular-nums text-zinc-300">{w}</span>)}</dd></div>
-              <div className="flex gap-3"><dt className="w-14 flex-none text-muted">themes</dt><dd className="text-zinc-300">{t.themes.join(', ')}</dd></div>
-              <div className="flex gap-3"><dt className="w-14 flex-none text-muted">text</dt><dd className="text-zinc-300">{t.text_stress.map(x => (x === 'pseudo' ? 'pseudo-localized (+35%)' : 'normal')).join(', ')}</dd></div>
-            </dl>
-            <div className="mt-3 border-t border-line pt-3 text-xs text-muted" data-testid="state-count">
-              Pressing Scan renders <b className="text-zinc-200">{n} states</b>
-              {appConfig && !appConfig.models_available && ' with geometry and the opacity diff only: no API key, so no SAM or Spark'}.
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-export function Stage() {
+/** One rendered screen with its overlay. Reads the selected state and tile from the store. */
+export function Viewer({ title }: { title?: string }) {
   const stateKey = useStore(s => s.stateKey)
   const st = useStore(s => (s.stateKey ? s.states[s.stateKey] : undefined))
   const tile = useStore(s => s.tile)
   const set = useStore(s => s.set)
-  const run = useStore(s => s.run)
-  const errors = useStore(s => s.errors)
-  const notes = useStore(s => s.notes)
-
   const loadDetail = useStore(s => s.loadDetail)
   useEffect(() => { if (stateKey) void loadDetail(stateKey) }, [stateKey, loadDetail])
 
   const t = st?.tiles[tile]
+  if (!st || !t) {
+    return <div className="grid min-h-0 flex-1 place-items-center p-8" data-testid="viewer-loading"><div className="skeleton h-64 w-48 rounded-lg" /></div>
+  }
   return (
-    <section className="flex min-w-0 flex-1 flex-col bg-ink" data-testid="stage">
-      {run?.status === 'failed' && (
-        <div className="border-b border-red-500/40 bg-red-500/10 px-4 py-2 text-xs text-red-200" data-testid="run-error">Scan failed: {errors[errors.length - 1]}</div>
-      )}
-      {notes.map(n => <div key={n} className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-200">{n}</div>)}
-
-      {!st || !t ? <EmptyState /> : (
-        <>
-          <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2">
-            <div className="min-w-0 text-xs">
-              <span className="font-medium">{st.route}</span>
-              <span className="text-muted"> · {st.width}px · {st.theme} · {st.text_stress === 'pseudo' ? 'pseudo-localized' : 'normal text'}</span>
-            </div>
-            {st.tiles.length > 1 && (
-              <div className="flex items-center gap-1" data-testid="tiles">
-                {st.tiles.map(x => (
-                  <button key={x.index} onClick={() => set({ tile: x.index })} title={`scrolled ${x.scroll_y}px`}
-                    className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${x.index === tile ? 'bg-white/15 text-white' : 'text-muted hover:text-zinc-200'}`}>
-                    {x.index + 1}
-                  </button>
-                ))}
-                <span className="pl-1 text-[11px] text-muted">of {st.tiles.length} screens</span>
-              </div>
-            )}
-            <div className="ml-auto"><LayerChips /></div>
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="stage">
+      <div className="flex flex-none flex-wrap items-center gap-3 px-4 py-2">
+        <div className="min-w-0 text-xs" data-testid="state-label">
+          {title && <span className="mr-2 font-medium text-zinc-200">{title}</span>}
+          <span className="font-mono text-zinc-300">{st.route}</span>
+          <span className="text-muted"> · {st.width}px · {st.theme} · {st.text_stress === 'pseudo' ? 'long text' : 'normal text'}</span>
+        </div>
+        {st.tiles.length > 1 && (
+          <div className="flex items-center gap-1" data-testid="tiles" title="The page as a user scrolls it">
+            {st.tiles.map(x => (
+              <button key={x.index} onClick={() => set({ tile: x.index })} title={`scrolled ${x.scroll_y}px`}
+                className={`rounded px-1.5 py-0.5 text-[11px] tabular-nums ${x.index === tile ? 'bg-white/15 text-white' : 'text-muted hover:text-zinc-200'}`}>
+                {x.index + 1}
+              </button>
+            ))}
+            <span className="pl-1 text-[11px] text-muted">of {st.tiles.length}</span>
           </div>
-
-          <div className="relative min-h-0 flex-1 overflow-auto p-4">
-            <div className="mx-auto h-full" style={{ aspectRatio: `${st.vw ?? st.width} / ${st.vh ?? st.height}`, maxWidth: '100%', maxHeight: '100%' }}>
-              <div className="relative h-full w-full overflow-hidden rounded-md border border-line bg-white shadow-2xl shadow-black/50" data-testid="tile">
-                <img key={t.sha} src={api.artifact(t.sha)} alt="" className="absolute inset-0 h-full w-full" draggable={false} />
-                {stateKey && <Overlay />}
-              </div>
-            </div>
+        )}
+        <div className="ml-auto"><LayerMenu /></div>
+      </div>
+      <div className="relative min-h-0 flex-1 overflow-auto px-4 pb-2">
+        <div className="mx-auto h-full" style={{ aspectRatio: `${st.vw ?? st.width} / ${st.vh ?? st.height}`, maxWidth: '100%', maxHeight: '100%' }}>
+          <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-white shadow-2xl shadow-black/50" data-testid="tile">
+            <img key={t.sha} src={api.artifact(t.sha)} alt={`${st.route} at ${st.width}px`} className="absolute inset-0 h-full w-full" draggable={false} />
+            <Overlay />
           </div>
-          <WidthScrubber />
-        </>
-      )}
+        </div>
+      </div>
+      <WidthScrubber />
     </section>
   )
 }
-

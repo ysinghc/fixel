@@ -1,8 +1,30 @@
 import type { Evidence, Finding, StateInfo } from './types'
 
+import type { Status } from './types'
+
+/** Plain-language names: a person reads "Runs off the screen", not viewport_protrusion. */
 export const TYPE_LABEL: Record<string, string> = {
-  viewport_protrusion: 'overflows viewport', element_protrusion: 'sticks out of its box', clipped_text: 'clipped text',
-  collision: 'collision', occlusion: 'covered', small_target: 'small tap target', contrast: 'low contrast',
+  viewport_protrusion: 'Runs off the screen', element_protrusion: 'Sticks out of its box', clipped_text: 'Text is cut off',
+  collision: 'Overlapping text', occlusion: 'Covered by something', small_target: 'Tap target too small', contrast: 'Hard to read (low contrast)',
+}
+
+/** One sentence each: what the defect means for the person using the page. */
+export const TYPE_EXPLAIN: Record<string, string> = {
+  viewport_protrusion: 'Content is wider than the screen, so it is cut off or the page scrolls sideways.',
+  element_protrusion: 'An element is drawn outside the box that should contain it.',
+  clipped_text: 'Part of the text is hidden by its container.',
+  collision: 'Two pieces of text are painted on top of each other.',
+  occlusion: 'Something is drawn over a control, so it cannot be seen or tapped.',
+  small_target: 'A control is smaller than a finger can reliably hit.',
+  contrast: 'The text colour is too close to its background to read comfortably.',
+}
+
+export const STATUS_LABEL: Record<Status, string> = { confirmed: 'Confirmed', needs_review: 'Needs review', dismissed: 'Dismissed', not_observable: 'Not visible' }
+export const STATUS_HELP: Record<Status, string> = {
+  confirmed: 'Geometry and pixels agree, and no model argued it away.',
+  needs_review: 'The model disagrees with the pixels, so a person should look.',
+  dismissed: 'Rejected: it scrolls apart by design, or was judged intentional. Shown so you can check.',
+  not_observable: 'The boxes overlap but nothing visible changes, so it is not a defect.',
 }
 
 export const SEVERITY_COLOR: Record<number, string> = { 4: '#ef4444', 3: '#f97316', 2: '#eab308', 1: '#64748b' }

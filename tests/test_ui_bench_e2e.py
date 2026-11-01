@@ -56,20 +56,20 @@ def empty_server(tmp_path):
         yield lv
 
 
-def test_benchmark_tab_says_nothing_was_measured_when_nothing_was(empty_server):
+def test_benchmark_page_says_nothing_was_measured_when_nothing_was(empty_server):
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=os.environ.get("FIXEL_CHROMIUM_PATH") or None)
         page = browser.new_page(viewport={"width": 1440, "height": 900})
         page.goto(empty_server.url)
-        page.get_by_test_id("tab-bench").click()
+        page.get_by_test_id("nav-benchmark").click()
         expect(page.get_by_test_id("bench-none")).to_contain_text("no benchmark has been run yet")
-        expect(page.get_by_test_id("human")).to_have_count(0)                        # no table, no invented numbers
-        page.get_by_test_id("tab-label").click()
+        expect(page.get_by_test_id("human-table")).to_have_count(0)                    # no table, no invented numbers
+        page.get_by_test_id("nav-label").click()
         expect(page.get_by_test_id("label-view")).to_contain_text("Nothing to label yet")
         browser.close()
 
 
-def test_blind_labelling_persists_and_feeds_the_benchmark_tab(server):
+def test_blind_labelling_persists_and_feeds_the_benchmark_page(server):
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=os.environ.get("FIXEL_CHROMIUM_PATH") or None)
         page = browser.new_page(viewport={"width": 1440, "height": 900})
@@ -78,14 +78,20 @@ def test_blind_labelling_persists_and_feeds_the_benchmark_tab(server):
         page.on("console", lambda m: m.type == "error" and problems.append(f"{m.text} {m.location.get('url', '')}"))
         page.goto(server.url)
 
+        # ------------------------------------------------------------- home points at the unfinished labelling
+        expect(page.get_by_test_id("todo-labels")).to_contain_text("7 screens left to label")
+
         # ------------------------------------------------------------- before any label: no human numbers
-        page.get_by_test_id("tab-bench").click()
+        page.get_by_test_id("nav-benchmark").click()
         expect(page.get_by_test_id("no-labels")).to_be_visible()
+        expect(page.get_by_test_id("headline")).to_contain_text("not a headline result")
+        expect(page.get_by_test_id("layer-chart").get_by_test_id("chart-bar")).to_have_count(2)   # geometry and + pixel diff
+        page.get_by_test_id("btab-details").click()
         expect(page.get_by_test_id("caveats")).to_contain_text("injected")
-        expect(page.get_by_text("not a headline result")).to_be_visible()
+        shot(page, "12-benchmark-unlabelled")
 
         # ------------------------------------------------------------- the labelling view is blind
-        page.get_by_test_id("tab-label").click()
+        page.get_by_test_id("nav-label").click()
         view = page.get_by_test_id("label-view")
         expect(page.get_by_test_id("label-progress")).to_have_text("0 / 7 labelled")
         expect(page.get_by_test_id("label-tile")).to_have_count(2)
@@ -108,21 +114,30 @@ def test_blind_labelling_persists_and_feeds_the_benchmark_tab(server):
 
         # ------------------------------------------------------------- labels survive a reload
         page.reload()
-        page.get_by_test_id("tab-label").click()
         expect(page.get_by_test_id("label-progress")).to_have_text("3 / 7 labelled")
 
-        # ------------------------------------------------------------- label everything, then the numbers appear
+        # ------------------------------------------------------------- label everything: a clear ending, then the numbers
         for _ in range(4):
             page.keyboard.press("v")
-        expect(page.get_by_test_id("label-progress")).to_have_text("7 / 7 labelled")
-        page.get_by_test_id("tab-bench").click()
-        expect(page.get_by_test_id("human-table")).to_be_visible()
-        rows = page.locator('[data-testid=human-table] tbody tr')
-        expect(rows).to_have_count(2)                                                  # geometry and + opacity diff
-        expect(rows.first).to_contain_text("Geometry")
-        expect(page.get_by_text("headline result", exact=True)).to_be_visible()         # test split + human labels
-        expect(page.get_by_test_id("agreement")).to_contain_text("Not detection accuracy")
-        expect(page.get_by_test_id("construction")).to_contain_text("Ghost banner")
+        expect(page.get_by_test_id("label-done")).to_contain_text("All 7 screens labelled")
+        expect(page.get_by_test_id("label-v")).not_to_be_visible()                      # nothing left to answer
+        page.keyboard.press("v")
+        expect(page.get_by_test_id("label-done")).to_be_visible()                      # a stray key does not relabel anything
+        shot(page, "13-label-done")
+        page.get_by_test_id("see-results").click()
+        expect(page.get_by_test_id("nav-benchmark")).to_have_attribute("aria-current", "page")
+        expect(page.get_by_test_id("nav-label")).not_to_have_attribute("aria-current", "page")
+        expect(page.get_by_test_id("headline")).to_contain_text("headline result")
+        expect(page.get_by_test_id("headline")).not_to_contain_text("not a headline")   # test split + human labels
+        expect(page.get_by_test_id("stat-precision")).to_be_visible()
         shot(page, "11-benchmark")
+        page.get_by_test_id("btab-human").click()
+        rows = page.locator('[data-testid=human-table] tbody tr')
+        expect(rows).to_have_count(2)                                                  # geometry and + pixel diff
+        expect(rows.first).to_contain_text("Geometry")
+        page.get_by_test_id("btab-injected").click()
+        expect(page.get_by_test_id("agreement")).to_contain_text("Not detection accuracy")
+        page.get_by_test_id("btab-known").click()
+        expect(page.get_by_test_id("construction")).to_contain_text("see-through banner")
         assert problems == [], problems
         browser.close()
