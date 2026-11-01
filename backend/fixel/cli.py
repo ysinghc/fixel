@@ -193,6 +193,17 @@ def cmd_bench(args) -> int:
         out = asyncio.run(rb.run_bench(bc))
         print(metrics.render(metrics.compute(out)))
         return 0
+    if args.bench_cmd == "fix":
+        from .bench import fix_bench as fb
+        out = asyncio.run(fb.run_fix_bench(fb.FixBenchConfig(split=args.split, n_cases=args.cases, seed=args.seed, model=args.model,
+                                                             arms=("lint_on",) if args.no_lint_arm else fb.ARMS, targets=args.targets,
+                                                             ops=args.ops, budget_usd=args.budget, out=Path(args.out) if args.out else None)))
+        print(fb.render(fb.compute(out)))
+        return 0
+    if args.bench_cmd == "fix-report":
+        from .bench import fix_bench as fb
+        print(fb.render(fb.compute(Path(args.run) if Path(args.run).exists() else fb.ROOT / args.run)))
+        return 0
     if args.bench_cmd == "import":
         print(f"imported run {bundle.import_bundle(Path(args.archive))} into .fixel/ (label it in the Label tab)")
         return 0
@@ -262,6 +273,20 @@ def main(argv: list[str] | None = None) -> int:
     br.add_argument("--parallel", type=int, default=4)
     br.add_argument("--out", help="run directory (default .fixel/bench/<timestamp>-<split>-s<seed>)")
     br.set_defaults(fn=cmd_bench)
+    bf = bsub.add_parser("fix", help="fix benchmark: inject defects into the source, then measure verified-fix rate, revert-equivalence and the linter")
+    bf.add_argument("--split", choices=["dev", "test"], default="dev")
+    bf.add_argument("--cases", type=int, default=20)
+    bf.add_argument("--seed", type=int, default=7)
+    bf.add_argument("--model", default="muse-wonder-1.0")
+    bf.add_argument("--targets", nargs="+")
+    bf.add_argument("--ops", nargs="+")
+    bf.add_argument("--no-lint-arm", action="store_true", help="skip the linter-off arm (halves the cost, loses the ablation)")
+    bf.add_argument("--budget", type=float, default=5.0)
+    bf.add_argument("--out")
+    bf.set_defaults(fn=cmd_bench)
+    bfr = bsub.add_parser("fix-report", help="print the report of a finished fix benchmark run")
+    bfr.add_argument("run")
+    bfr.set_defaults(fn=cmd_bench)
     bp = bsub.add_parser("report", help="print the report for a finished run (with --labels: add human-label metrics)")
     bp.add_argument("run", help="run id or directory")
     bp.add_argument("--labels", action="store_true")

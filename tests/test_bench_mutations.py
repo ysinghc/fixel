@@ -74,13 +74,16 @@ def test_operator_injects_and_the_oracles_see_the_defect(name):
     assert {c.type for c in new} & BY_NAME[name].hits, f"{name}: new candidates were {[(c.type, c.metrics) for c in new]}"
 
 
-def test_ghost_banner_paints_but_hit_testing_is_blind_to_it():
-    # the documented gap: occlusion starts from hit testing, so a pointer-events:none banner is not a candidate
+def test_ghost_banner_is_found_by_the_second_hit_test_that_ignores_pointer_events_none():
+    # elementFromPoint skips pointer-events:none, so the plain hit test is blind to a ghost banner; the sampler's second
+    # pass makes everything hittable and marks the cover as a ghost
     applied, base_keys, cands, cap, loc = mutate("ghost_banner")
     assert applied
-    assert not [c for c in cands if c.type == "occlusion" and candidate_key(cap, c) not in base_keys]
+    new = [c for c in cands if c.type == "occlusion" and candidate_key(cap, c) not in base_keys]
+    assert new and all(c.metrics.get("ghost") == 1.0 for c in new), [(c.type, c.metrics) for c in cands]
     opaque = mutate("opaque_banner")
-    assert [c for c in opaque[2] if c.type == "occlusion" and candidate_key(opaque[3], c) not in opaque[1]]
+    plain = [c for c in opaque[2] if c.type == "occlusion" and candidate_key(opaque[3], c) not in opaque[1]]
+    assert plain and not any(c.metrics.get("ghost") for c in plain), "an ordinary banner is not marked as a ghost"
 
 
 @pytest.mark.parametrize("name", ["badge_overlap", "open_dropdown", "invisible_overlap"])

@@ -84,6 +84,7 @@ class FixResult:
     turns: int = 0
     tokens: int = 0
     citations: list[str] = field(default_factory=list)
+    blocked: int = 0                             # edits the linter reverted
 
 
 def checklist(v: Verification) -> dict:
@@ -119,7 +120,7 @@ async def fix_finding(f: Finding, ws: Workspace, baseline: list[Scanned], store:
             status = "budget"
         else:
             status = "failed" if v else "gave_up"            # gave_up: the model made no edits
-        res = FixResult(f.key, status, llm.model, summary, diff, v, attempts, turns, llm.tokens, list(ctx.citations))
+        res = FixResult(f.key, status, llm.model, summary, diff, v, attempts, turns, llm.tokens, list(ctx.citations), ctx.rejected)
         await say({"type": "fix.done", "status": status, "model": llm.model, "turns": turns})
         return res
 

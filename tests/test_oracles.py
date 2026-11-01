@@ -92,9 +92,15 @@ def test_occlusion_fires_when_banner_covers_button(found):
     assert types(found(html, height=560), "occlusion")
 
 
-def test_occlusion_blind_to_pointer_events_none_overlay(found):
-    # documented blind spot: elementFromPoint ignores pointer-events:none, the pixel layer catches it
+def test_occlusion_finds_a_pointer_events_none_overlay_and_marks_it_a_ghost(found):
+    # elementFromPoint ignores pointer-events:none; the sampler's second pass makes everything hittable and flags the cover
     html = RESET + '<div style="height:480px"></div><button style="width:140px;height:44px">Checkout</button>' + BANNER.format(extra=";pointer-events:none")
+    hits = types(found(html, height=560), "occlusion")
+    assert hits and all(c.metrics.get("ghost") == 1.0 for c in hits)
+
+
+def test_a_pointer_events_none_overlay_that_leaves_the_button_alone_is_no_candidate(found):
+    html = RESET + '<button style="width:140px;height:44px">Checkout</button><div style="height:480px"></div>' + BANNER.format(extra=";pointer-events:none")
     assert not types(found(html, height=560), "occlusion")
 
 

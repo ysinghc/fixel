@@ -210,7 +210,7 @@ async def dispatch(name: str, args: dict, ctx: FixContext, emit=None) -> tuple[o
             if err:
                 return {"error": err}, []
             diff = await ws.diff()
-            errs = lint(diff, ws.allowed_files)
+            errs = lint(diff, ws.allowed_files) if ws.lint_enabled else []
             if emit:
                 await emit({"type": "fix.patch", "diff": diff, "lint": errs})
             if errs:

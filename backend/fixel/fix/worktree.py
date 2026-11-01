@@ -46,6 +46,7 @@ class Workspace:
         self.server: TargetServer | None = None
         self.allowed_files: set[str] = set()                  # the localized set the linter allows a patch to touch
         self.url = ""
+        self.lint_enabled = True                              # the fix benchmark turns the linter off to measure what it stops
 
     # ------------------------------------------------------------------ lifecycle
     @classmethod

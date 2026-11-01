@@ -51,7 +51,7 @@ async def verify(f: Finding, ws: Workspace, baseline: list[Scanned], store: Arti
         if emit:
             await emit({"type": "fix.verify", "item": item, "ok": ok})
 
-    errs = lint(diff, ws.allowed_files)
+    errs = lint(diff, ws.allowed_files) if ws.lint_enabled else []
     lint_ok = not errs
     notes += [f"lint: {e}" for e in errs]
     await say("lint", lint_ok)

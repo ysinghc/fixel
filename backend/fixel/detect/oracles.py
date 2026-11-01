@@ -191,7 +191,7 @@ def occlusions(tile: Tile, min_cover: float = 0.4):
             hit = by_id.get(o["by"])
             root = pinned_root(hit, by_id) if hit else None
             ids.append(root.id if root else o["by"])
-        out.append(cand("occlusion", tile, ids, covered=o["covered"]))
+        out.append(cand("occlusion", tile, ids, covered=o["covered"], **({"ghost": 1.0} if o.get("ghost") else {})))
     return out
 
 
