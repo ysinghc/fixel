@@ -23,7 +23,8 @@ export interface Target {
   text_stress: string[]
   height: number
 }
-export interface AppConfig { mode: 'live' | 'record' | 'replay'; models_available: boolean; budget_usd: number }
+export interface PublicLimits { daily_usd: number; spent_today_usd: number; model_scans_per_hour: number; scans_per_hour: number; fixes_per_hour: number; run_budget_usd: number }
+export interface AppConfig { mode: 'live' | 'record' | 'replay'; models_available: boolean; budget_usd: number; public?: boolean; limits?: PublicLimits | null }
 export interface RunRow { id: string; kind: string; created: number; status: string; config: { config: string; models?: boolean }; summary: { counts?: Record<string, number>; total_usd?: number; states?: number } }
 export interface RunDetail extends RunRow { findings: { key: string; status: string }[]; fixes: { id: string; key: string; status: string }[]; active: boolean }
 

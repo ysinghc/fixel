@@ -59,7 +59,7 @@ export function RunHeader() {
       {running && (
         <div className="mt-3 max-w-xl" data-testid="run-progress">
           <div className="mb-1 flex text-xs text-muted"><span>Rendering and checking screens</span><span className="ml-auto tabular-nums">{done} of {run.states}</span></div>
-          <Progress value={done} total={run.states} />
+          <Progress value={done} total={run.states} label="Screens scanned" />
         </div>
       )}
       {run.status === 'failed' && <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200" data-testid="run-error">The scan failed: {errors[errors.length - 1]}</div>}

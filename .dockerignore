@@ -1,0 +1,7 @@
+.venv
+**/node_modules
+web/dist
+.fixel
+.env
+**/__pycache__
+.pytest_cache

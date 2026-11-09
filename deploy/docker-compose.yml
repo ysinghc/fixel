@@ -1,0 +1,35 @@
+# fixel.ysinghc.in on one VM: Caddy (HTTPS, compression, a first rate limit) in front of the Fixel container.
+# Usage on the server:  cp ../.env.example ../.env && edit MODEL_API_KEY;  docker compose up -d --build
+services:
+  fixel:
+    build: ..
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      FIXEL_PUBLIC: "1"
+      FIXEL_TRUST_PROXY: "1"            # only Caddy can reach this container; it sets X-Forwarded-For
+      FIXEL_DAILY_USD: "5"              # all model calls on the server, per UTC day
+      FIXEL_RUN_BUDGET_USD: "1"         # one scan or fix
+      FIXEL_MODEL_SCANS_PER_HOUR: "3"   # per visitor IP
+      FIXEL_FIXES_PER_HOUR: "2"
+      FIXEL_SCANS_PER_HOUR: "12"
+      FIXEL_RPM: "240"
+    volumes:
+      - fixel-data:/app/.fixel
+    expose: ["8765"]                    # not published: reachable only through Caddy
+    shm_size: 1gb                       # Chromium needs more than Docker's 64 MB default
+    mem_limit: 4g
+    cpus: 2
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [fixel]
+
+volumes:
+  fixel-data:
+  caddy-data:

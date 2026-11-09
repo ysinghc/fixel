@@ -5,6 +5,7 @@ Findings are decided by code from geometry plus pixels; Spark can only dismiss o
 (or --offline) the scan still runs on geometry plus the model-free opacity diff, the same fallback as a model outage.
 """
 import argparse
+import os
 import asyncio
 import json
 import time
@@ -177,9 +178,12 @@ def cmd_serve(args) -> int:
     import uvicorn
     from .api.server import create_app
     load_dotenv()
-    app = create_app(".", budget_usd=args.budget)
-    print(f"fixel API and UI on http://{args.host}:{args.port}  (mode {meta_mode()}, models {'on' if models_available() else 'off'})")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    public = args.public or os.environ.get("FIXEL_PUBLIC", "") in ("1", "true", "yes")
+    roots = [Path(p) for p in os.environ.get("FIXEL_CONFIG_ROOTS", "").split(":") if p] or None   # e.g. only targets/demo-shop.yaml
+    app = create_app(".", budget_usd=args.budget, public=public, config_roots=roots)
+    print(f"fixel API and UI on http://{args.host}:{args.port}  (mode {meta_mode()}, models {'on' if models_available() else 'off'}"
+          + (f", public: {app.state.limiter.status()}" if public else "") + ")")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning", proxy_headers=False)
     return 0
 
 
@@ -256,6 +260,7 @@ def main(argv: list[str] | None = None) -> int:
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
     sv.add_argument("--budget", type=float, default=10.0, help="stop starting model calls for a run once it has cost this many dollars")
+    sv.add_argument("--public", action="store_true", help="rate limits and a daily model spend cap for a public deployment (see api/limits.py)")
     sv.set_defaults(fn=cmd_serve)
     bn = sub.add_parser("bench", help="inject known defects into corpus pages and measure detection")
     bsub = bn.add_subparsers(dest="bench_cmd", required=True)

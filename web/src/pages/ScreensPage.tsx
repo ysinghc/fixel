@@ -54,7 +54,7 @@ export function ScreensPage() {
                             <Link to={paths.screen(runId, st.key)} data-testid={`screen-${w}-${r.theme}-${r.stress}`} data-count={n}
                               className="group relative block h-36 w-28 overflow-hidden rounded-lg border border-line bg-raised hover:border-sky-400">
                               <img src={api.artifact(st.tiles[0].sha)} alt="" className="h-full w-full object-cover object-top" loading="lazy" />
-                              {n > 0 && <span className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white" data-testid="screen-count">{n}</span>}
+                              {n > 0 && <span className="absolute right-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white" data-testid="screen-count">{n}</span>}
                             </Link>
                           ) : <div className="skeleton h-36 w-28 rounded-lg" />}
                         </td>

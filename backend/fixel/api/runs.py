@@ -46,6 +46,7 @@ class RunManager:
         self.stopped: set[str] = set()                     # runs that ran out of budget: nothing new starts
         self.cancelled: set[str] = set()                   # runs the user cancelled
         self.fix_lock = asyncio.Lock()                     # one fix session at a time (a dev server and a browser each)
+        self.on_spend = None                               # (run_id, usd) -> bool: True stops the run (public daily cap)
 
     # ------------------------------------------------------------------ events
     async def emit(self, run_id: str, ev: dict) -> dict:
@@ -54,7 +55,8 @@ class RunManager:
             usd = cost.usd(ev.get("kind", ""), ev.get("model"), ev.get("usage"), ev.get("source", "live"))
             self.cost[run_id] += usd
             ev = {**ev, "usd": round(usd, 6), "total_usd": round(self.cost[run_id], 6)}
-            if self.cost[run_id] >= self.budget_usd and run_id not in self.stopped:
+            over_daily = bool(usd and self.on_spend and self.on_spend(run_id, usd))
+            if (over_daily or self.cost[run_id] >= self.budget_usd) and run_id not in self.stopped:
                 self.stopped.add(run_id)                   # in-flight calls finish; nothing new starts
                 await self.emit(run_id, {"type": "budget.exceeded", "budget_usd": self.budget_usd,
                                          "total_usd": round(self.cost[run_id], 6)})

@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { paths } from '../paths'
 import { api } from '../api'
 import type { BenchLabelValue, BenchQueue, BenchRunRow, QueueItem } from '../types'
-import { Button, Chip } from '../components/ui'
+import { Button, ButtonLink, Chip, Progress } from '../components/ui'
 
 const LABELS: { value: BenchLabelValue; text: string; key: string; tone: string }[] = [
-  { value: 'visible_defect', text: 'Visible defect', key: 'v', tone: 'bg-red-500/80 hover:bg-red-500 text-white' },
-  { value: 'no_visible_defect', text: 'No visible defect', key: 'n', tone: 'bg-emerald-500/80 hover:bg-emerald-500 text-black' },
-  { value: 'unsure', text: 'Unsure', key: 'u', tone: 'bg-amber-400/80 hover:bg-amber-400 text-black' },
+  { value: 'visible_defect', text: 'Visible defect', key: 'v', tone: 'bg-red-600 hover:bg-red-700 text-white' },
+  { value: 'no_visible_defect', text: 'No visible defect', key: 'n', tone: 'bg-emerald-500 hover:bg-emerald-400 text-black' },
+  { value: 'unsure', text: 'Unsure', key: 'u', tone: 'bg-amber-400 hover:bg-amber-300 text-black' },
 ]
 const SQUARE: Record<string, string> = { visible_defect: 'bg-red-500', no_visible_defect: 'bg-emerald-500', unsure: 'bg-amber-400' }
 
@@ -87,9 +86,9 @@ export function LabelPage() {
   }
 
   return (
-    <div className="flex h-full min-h-0" data-testid="label-view">
-      <aside className="flex w-64 flex-none flex-col gap-3 overflow-y-auto border-r border-line bg-panel p-3">
-        <select value={run} onChange={e => setRun(e.target.value)} data-testid="label-run" className="h-7 rounded-md border border-line bg-raised px-2 text-xs">
+    <div className="flex h-full min-h-0 flex-col md:flex-row" data-testid="label-view">
+      <aside className="flex max-h-[40vh] flex-none flex-col gap-3 overflow-y-auto border-b border-line bg-panel p-3 md:max-h-none md:w-64 md:border-b-0 md:border-r" aria-label="Labelling progress">
+        <select value={run} onChange={e => setRun(e.target.value)} data-testid="label-run" aria-label="Benchmark run to label" className="h-7 rounded-md border border-line bg-raised px-2 text-xs">
           {runs.map(r => <option key={r.run} value={r.run}>{r.run}</option>)}
         </select>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -98,10 +97,10 @@ export function LabelPage() {
             : <Chip tone="zinc" title="A development run is for tuning; its labels are practice and are never a headline">development split (practice)</Chip>}
           <span className="text-xs tabular-nums text-zinc-300" data-testid="label-progress">{done} / {items.length} labelled</span>
         </div>
-        <div className="h-1 overflow-hidden rounded bg-line"><div className="h-full bg-sky-500 transition-all" style={{ width: `${items.length ? (done / items.length) * 100 : 0}%` }} /></div>
+        <Progress value={done} total={items.length} label="Screens labelled" />
         <div className="grid grid-cols-10 gap-1" data-testid="label-grid">
           {items.map((x, k) => (
-            <button key={x.id} onClick={() => setI(k)} title={`#${x.n}${x.label ? ` · ${x.label.replace(/_/g, ' ')}` : ''}`} data-testid="label-item" data-label={x.label ?? ''}
+            <button key={x.id} onClick={() => setI(k)} aria-label={`Screen ${x.n}${x.label ? `, labelled ${x.label.replace(/_/g, ' ')}` : ', not labelled'}`} aria-current={k === i ? 'true' : undefined} title={`#${x.n}${x.label ? ` · ${x.label.replace(/_/g, ' ')}` : ''}`} data-testid="label-item" data-label={x.label ?? ''}
               className={`h-4 rounded-sm ${x.label ? SQUARE[x.label] : 'bg-[#2a2f3b]'} ${k === i ? 'ring-2 ring-white' : ''}`} />
           ))}
         </div>
@@ -112,19 +111,19 @@ export function LabelPage() {
         <p className="text-[11px] leading-4 text-muted">Keys: <kbd>v</kbd> visible · <kbd>n</kbd> none · <kbd>u</kbd> unsure · <kbd>←</kbd>/<kbd>→</kbd> move.</p>
       </aside>
 
-      <main className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2">
+      <section className="flex min-w-0 flex-1 flex-col" aria-label="Screen to label">
+        <div className="flex flex-none flex-wrap items-center gap-3 border-b border-line px-4 py-2">
           <span className="text-sm font-medium">Screen {item?.n ?? '–'} of {items.length}</span>
           {item && <span className="text-xs text-muted" data-testid="label-meta">{item.route} · {item.width}px · {item.theme} · {item.text_stress === 'pseudo' ? 'long text' : 'normal text'}</span>}
-          <div className={`ml-auto flex items-center gap-2 ${finished ? 'invisible' : ''}`}>
-            <Button onClick={() => go(-1)} disabled={i === 0} title="Previous (←)">←</Button>
+          <div className={`ml-auto flex flex-wrap items-center gap-2 ${finished ? 'invisible' : ''}`}>
+            <Button onClick={() => go(-1)} disabled={i === 0} title="Previous (←)" aria-label="Previous screen">←</Button>
             {LABELS.map(l => (
               <button key={l.value} onClick={() => label(l.value)} data-testid={`label-${l.key}`} data-on={item?.label === l.value} title={`${l.text} (${l.key})`}
                 className={`h-7 rounded-md px-3 text-xs font-semibold ${l.tone} ${item?.label === l.value ? 'ring-2 ring-white' : ''}`}>
                 {l.text} <kbd className="ml-1 opacity-70">{l.key}</kbd>
               </button>
             ))}
-            <Button onClick={() => go(1)} disabled={i >= items.length - 1} title="Next (→)">→</Button>
+            <Button onClick={() => go(1)} disabled={i >= items.length - 1} title="Next (→)" aria-label="Next screen">→</Button>
           </div>
         </div>
         {error && <div className="bg-red-500/15 px-4 py-1.5 text-xs text-red-200" data-testid="label-error">{error}</div>}
@@ -136,11 +135,11 @@ export function LabelPage() {
               <p className="text-sm text-muted">Thank you. These labels are the ground truth for the benchmark's headline numbers.</p>
               {split === 'test' && <p className="text-xs text-muted">To share them, run <code className="rounded bg-black/40 px-1">fixel bench export {run}</code> and push <code className="rounded bg-black/40 px-1">labels.json</code>.</p>}
               <div className="flex justify-center gap-2 pt-2">
-                <Link to={paths.benchmark} className="inline-flex h-9 items-center rounded-lg bg-sky-500 px-4 text-sm font-medium text-white hover:bg-sky-400" data-testid="see-results">See the results</Link>
+                <ButtonLink to={paths.benchmark} kind="primary" size="md" data-testid="see-results">See the results</ButtonLink>
                 <Button size="md" onClick={() => { setReviewing(true); setI(0) }}>Review my labels</Button>
               </div>
             </div>
-          ) : !item ? <p className="text-sm text-muted">Loading…</p> : (
+          ) : !item ? <p className="text-sm text-muted" role="status">Loading…</p> : (
             <div className="mx-auto flex w-fit max-w-full flex-col" data-testid="label-screen" style={{ width: Math.min(item.width, 1400) }}>
               {item.tiles.map((sha, t) => (
                 <img key={sha + t} src={api.artifact(sha)} alt={`screen ${item.n}, part ${t + 1}`} data-testid="label-tile"
@@ -150,7 +149,7 @@ export function LabelPage() {
             </div>
           )}
         </div>
-      </main>
+      </section>
     </div>
   )
 }

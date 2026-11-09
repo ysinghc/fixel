@@ -5,6 +5,7 @@ replays history first (`?after=<seq>`, or the browser's Last-Event-ID) and never
 """
 import asyncio
 import json
+import os
 import re
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from ..meta import client as meta
 from ..scan import models_available
 from ..store import ArtifactStore
 from .db import DB
+from .limits import Limited, Limiter, Limits
 from .runs import DEFAULT_BUDGET_USD, RunError, RunManager
 
 SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -64,12 +66,52 @@ class LabelRequest(BaseModel):
 
 def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_root: Path | str | None = None,
                config_roots: list[Path] | None = None, llm_factory=None, budget_usd: float = DEFAULT_BUDGET_USD,
-               web_dist: Path | str | None = None, bench_root: Path | str | None = None) -> FastAPI:
+               web_dist: Path | str | None = None, bench_root: Path | str | None = None,
+               public: bool = False, limits: Limits | None = None) -> FastAPI:
+    """public=True turns on the rate limits and spend caps in limits.py, for a deployment anyone can reach."""
     root = Path(root).resolve()
+    limiter = Limiter(limits or Limits.from_env(), root / ".fixel" / "spend.json") if public else None
+    if limiter:
+        budget_usd = min(budget_usd, limiter.limits.run_budget_usd)
     mgr = RunManager(DB(db_path or root / ".fixel" / "fixel.db"), ArtifactStore(store_root or root / ".fixel" / "artifacts"),
                      root, config_roots, llm_factory, budget_usd)
     app = FastAPI(title="Fixel", version="0.1")
     app.state.mgr = mgr
+    app.state.limiter = limiter
+
+    @app.exception_handler(Limited)
+    async def limited(_: Request, e: Limited):
+        return JSONResponse({"detail": str(e)}, status_code=e.status,
+                            headers={"Retry-After": str(e.retry_after)} if e.retry_after else None)
+
+    def ip_of(request: Request) -> str:
+        return limiter.client_ip(request.headers, request.client.host if request.client else None)
+
+    def active_runs() -> int:
+        return sum(not t.done() for t in mgr.tasks.values())
+
+    def guard_start(request: Request, kind: str, models: bool) -> None:
+        if limiter:
+            limiter.start(kind, ip_of(request), models, active_runs())
+
+    def guard_write(what: str) -> None:
+        if limiter:
+            raise Limited(f"{what} are read-only on this public instance", status=403)
+
+    if limiter:
+        def on_spend(run_id: str, usd: float) -> bool:
+            limiter.spend.add(usd)
+            return limiter.budget_left() <= 0
+        mgr.on_spend = on_spend
+
+        @app.middleware("http")
+        async def rate_limit(request: Request, call_next):
+            if request.url.path.startswith("/api/"):
+                try:
+                    limiter.request(ip_of(request))
+                except Limited as e:
+                    return JSONResponse({"detail": str(e)}, status_code=429, headers={"Retry-After": str(e.retry_after or 60)})
+            return await call_next(request)
 
     @app.exception_handler(RunError)
     async def run_error(_: Request, e: RunError):
@@ -78,7 +120,8 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
     # ------------------------------------------------------------------ config and targets
     @app.get("/api/config")
     def get_config():
-        return {"mode": meta.mode(), "models_available": models_available(), "budget_usd": mgr.budget_usd}
+        return {"mode": meta.mode(), "models_available": models_available(), "budget_usd": mgr.budget_usd,
+                "public": bool(limiter), "limits": limiter.status() if limiter else None}
 
     @app.get("/api/targets")
     def get_targets():
@@ -86,7 +129,10 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
 
     # ------------------------------------------------------------------ scans and runs
     @app.post("/api/scans")
-    async def start_scan(req: ScanRequest):
+    async def start_scan(req: ScanRequest, request: Request):
+        if limiter and req.base_url:
+            raise Limited("scanning an arbitrary URL is turned off on this public instance; pick a target", status=403)
+        guard_start(request, "scan", req.models and models_available())
         return {"run_id": mgr.start_scan(req.model_dump())}
 
     @app.get("/api/runs")
@@ -156,7 +202,8 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
                 "label": next((x for x in mgr.db.labels(run_id) if x["key"] == key), None)}
 
     @app.post("/api/fix")
-    async def start_fix(req: FixRequest):
+    async def start_fix(req: FixRequest, request: Request):
+        guard_start(request, "fix", True)
         fix_id = mgr.start_fix(req.run_id, req.key, req.model, {"widths": req.widths, "themes": req.themes, "stress": req.stress})
         return {"fix_id": fix_id, "run_id": req.run_id}
 
@@ -182,6 +229,7 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
     # ------------------------------------------------------------------ labels (the benchmark's human ground truth)
     @app.post("/api/labels")
     def put_label(req: LabelRequest):
+        guard_write("labels")
         if req.label not in LABELS:
             raise HTTPException(422, f"label must be one of {LABELS}")
         if not mgr.db.finding(req.run_id, req.key):
@@ -237,6 +285,7 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
 
     @app.put("/api/bench/{run}/labels")
     def bench_label(run: str, req: BenchLabel):
+        guard_write("benchmark labels")
         d = bench_run(run)
         if req.case_id not in queue(d):
             raise HTTPException(404, "that case is not in this run's labelling queue")
@@ -331,4 +380,4 @@ def create_app(root: Path | str = ".", db_path: Path | str | None = None, store_
 def app_from_env() -> FastAPI:
     """uvicorn --factory entry point: reads .env, serves the repo it is started in."""
     load_dotenv()
-    return create_app(".")
+    return create_app(".", public=os.environ.get("FIXEL_PUBLIC", "") in ("1", "true", "yes"))

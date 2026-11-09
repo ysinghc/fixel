@@ -26,7 +26,7 @@ export function Dot({ color, pulse = false, size = 8 }: { color: string; pulse?:
 }
 
 const KINDS = {
-  primary: 'bg-sky-500 text-white hover:bg-sky-400 disabled:bg-sky-500/30 disabled:text-white/50',
+  primary: 'bg-sky-400 text-black hover:bg-sky-300 disabled:bg-sky-400/30 disabled:text-black/60',
   ghost: 'border border-line bg-raised text-zinc-200 hover:bg-[#1f2430] disabled:opacity-40',
   danger: 'border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 disabled:opacity-40',
   success: 'bg-emerald-500 text-black hover:bg-emerald-400 disabled:opacity-40',
@@ -61,7 +61,7 @@ export function PageHeader({ title, subtitle, back, actions, testid }: {
   return (
     <header className="mb-6 flex flex-wrap items-end gap-4" data-testid={testid}>
       <div className="min-w-0 flex-1">
-        {back && <Link to={back.to} className="mb-1 inline-block text-xs text-muted hover:text-zinc-200" data-testid="back">← {back.label}</Link>}
+        {back && <Link to={back.to} className="mb-1 inline-block text-xs text-muted hover:text-zinc-200" data-testid="back"><span aria-hidden>← </span>{back.label}</Link>}
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {subtitle && <div className="mt-1 text-sm text-muted">{subtitle}</div>}
       </div>
@@ -114,10 +114,10 @@ export function Empty({ icon = '◫', title, children, action, testid }: { icon?
   )
 }
 
-export function Progress({ value, total, tone = 'sky', testid }: { value: number; total: number; tone?: 'sky' | 'emerald'; testid?: string }) {
+export function Progress({ value, total, tone = 'sky', testid, label = 'Progress' }: { value: number; total: number; tone?: 'sky' | 'emerald'; testid?: string; label?: string }) {
   const pct = total ? Math.min(100, (value / total) * 100) : 0
   return (
-    <div className="h-1.5 overflow-hidden rounded-full bg-line" data-testid={testid} role="progressbar" aria-valuenow={value} aria-valuemax={total}>
+    <div className="h-1.5 overflow-hidden rounded-full bg-line" data-testid={testid} role="progressbar" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={total}>
       <div className={`h-full rounded-full transition-all duration-300 ${tone === 'sky' ? 'bg-sky-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
     </div>
   )

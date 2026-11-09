@@ -96,7 +96,7 @@ export function BenchmarkPage() {
     <div className="mx-auto max-w-5xl p-4 md:p-8" data-testid="bench">
       <PageHeader title="Benchmark" subtitle="How well Fixel finds layout bugs, measured against blind human labels and cases with known answers."
         actions={(
-          <select value={run} onChange={e => setRun(e.target.value)} data-testid="bench-run" className="h-9 rounded-lg border border-line bg-raised px-2 text-xs">
+          <select value={run} onChange={e => setRun(e.target.value)} data-testid="bench-run" aria-label="Benchmark run" className="h-9 rounded-lg border border-line bg-raised px-2 text-xs">
             {list.runs.map(r => <option key={r.run} value={r.run}>{r.run}{r.split ? ` (${r.split})` : ''}</option>)}
           </select>
         )} />

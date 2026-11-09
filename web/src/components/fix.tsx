@@ -162,7 +162,7 @@ export function CheckList({ fix }: { fix: Fix }) {
         const v = fix.checks[c]
         return (
           <li key={c} data-testid="check" data-check={c} data-state={v === undefined ? 'pending' : v ? 'ok' : 'fail'} className="flex items-center gap-2 text-[13px]">
-            <span className={`grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] ${v === undefined ? 'border border-line text-transparent' : v ? 'bg-emerald-500/80 text-black' : 'bg-red-500 text-white'}`}>{v ? '✓' : v === false ? '✗' : '·'}</span>
+            <span className={`grid h-5 w-5 flex-none place-items-center rounded-full text-[11px] ${v === undefined ? 'border border-line text-transparent' : v ? 'bg-emerald-500/80 text-black' : 'bg-red-600 text-white'}`}>{v ? '✓' : v === false ? '✗' : '·'}</span>
             <span className={v === false ? 'font-medium text-red-300' : v ? 'text-zinc-200' : 'text-muted'}>{CHECK_LABEL[c]}</span>
           </li>
         )

@@ -67,7 +67,7 @@ export function Home() {
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] font-medium">{t.text}</div>
                     <div className="text-xs text-muted">{t.detail}</div>
-                    {t.progress && <div className="mt-2 max-w-sm"><Progress value={t.progress[0]} total={t.progress[1]} /></div>}
+                    {t.progress && <div className="mt-2 max-w-sm"><Progress value={t.progress[0]} total={t.progress[1]} label="Task progress" /></div>}
                   </div>
                   <span className="text-sm text-sky-300">→</span>
                 </Link>
@@ -79,7 +79,7 @@ export function Home() {
 
       <Card title="Recent scans" className="mt-6" testid="recent" aside={runs && runs.length > 0 ? <Link to={paths.runs} className="text-xs text-sky-300 hover:underline">All results →</Link> : null}>
         {runs === null ? <div className="skeleton h-16 rounded-lg" /> : runs.length === 0 ? (
-          <p className="py-4 text-sm text-muted" data-testid="no-scans">No scans yet. <Link to={paths.scan} className="text-sky-300 hover:underline">Start your first scan</Link>; it takes about a minute on the demo app.</p>
+          <p className="py-4 text-sm text-muted" data-testid="no-scans">No scans yet. <Link to={paths.scan} className="text-sky-300 underline underline-offset-2 hover:text-sky-200">Start your first scan</Link>; it takes about a minute on the demo app.</p>
         ) : (
           <ul className="divide-y divide-line">
             {runs.slice(0, 5).map(r => (
@@ -103,7 +103,7 @@ function ActionCard({ to, icon, title, text, primary, testid }: { to: string; ic
   return (
     <Link to={to} data-testid={testid}
       className={`group flex flex-col gap-3 rounded-xl border p-5 transition-colors ${primary ? 'border-sky-500/50 bg-sky-500/10 hover:bg-sky-500/15' : 'border-line bg-panel hover:border-zinc-600'}`}>
-      <span className={`grid h-10 w-10 place-items-center rounded-lg ${primary ? 'bg-sky-500 text-white' : 'bg-raised text-zinc-300'}`}><Icon name={icon} /></span>
+      <span className={`grid h-10 w-10 place-items-center rounded-lg ${primary ? 'bg-sky-400 text-black' : 'bg-raised text-zinc-300'}`}><Icon name={icon} /></span>
       <div>
         <div className="text-[15px] font-semibold">{title} <span className="opacity-0 transition-opacity group-hover:opacity-100">→</span></div>
         <p className="mt-1 text-xs leading-5 text-muted">{text}</p>

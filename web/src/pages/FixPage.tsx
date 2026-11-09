@@ -31,14 +31,14 @@ function Stepper({ fix, total }: { fix: Fix; total: number }) {
         return (
           <li key={p} className="flex flex-1 items-start" data-testid="step" data-state={state}>
             <div className="flex flex-col items-center">
-              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${bad ? 'bg-red-500 text-white' : state === 'done' ? 'bg-emerald-500 text-black' : state === 'now' ? 'pulse bg-sky-500 text-white' : 'border border-line bg-raised text-muted'}`}>
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${bad ? 'bg-red-600 text-white' : state === 'done' ? 'bg-emerald-500 text-black' : state === 'now' ? 'pulse bg-sky-400 text-black' : 'border border-line bg-raised text-muted'}`}>
                 {bad ? '✗' : state === 'done' ? '✓' : i + 1}
               </span>
             </div>
             <div className="ml-2 min-w-0 flex-1 pr-2">
               <div className={`text-xs font-medium ${state === 'todo' ? 'text-muted' : 'text-zinc-100'}`}>{p}</div>
               <div className="text-[11px] text-muted">{state === 'todo' ? '' : detail[i]}</div>
-              {i === 0 && state === 'now' && fix.baseline.total > 0 && <div className="mt-1 w-32"><Progress value={fix.baseline.done} total={fix.baseline.total} /></div>}
+              {i === 0 && state === 'now' && fix.baseline.total > 0 && <div className="mt-1 w-32"><Progress value={fix.baseline.done} total={fix.baseline.total} label="Baseline screens captured" /></div>}
             </div>
             {i < PHASES.length - 1 && <span className={`mt-3.5 h-0.5 w-8 flex-none rounded ${i < cur ? 'bg-emerald-500/70' : 'bg-line'}`} />}
           </li>
@@ -71,7 +71,7 @@ function Verdict({ fix, screens }: { fix: Fix; screens: number }) {
   return (
     <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-5" data-testid="verdict" data-ok="false">
       <div className="flex flex-wrap items-center gap-4">
-        <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-red-500 text-xl font-bold text-white">✗</span>
+        <span className="grid h-11 w-11 flex-none place-items-center rounded-full bg-red-600 text-xl font-bold text-white">✗</span>
         <div className="min-w-0 flex-1">
           <div className="text-[15px] font-semibold text-red-100" data-testid="not-verified">Not verified: nothing is shown as fixed</div>
           <p className="mt-0.5 text-xs text-red-200/80">
